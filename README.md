@@ -12,7 +12,7 @@ Kafkaesque streams built on firebase
 
 3. Set the FIREBASE_CONFIG environment variable to the contents of your `json` key file. (Sometimes it may be necessary to wrap the key contents in single quotes to escape all the special characters within it. e.g. FIREBASE_CONFIG='`contents-of-json`')
 
-4. You're now good to go
+4. You're now good to go.
 
 ## Usage
 

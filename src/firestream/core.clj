@@ -2,16 +2,28 @@
   (:require [charmander.database :as charm]
             [clojure.core.async :as async]))
 
+(def root "streams")
+
+(defn- serialize-data [data]
+  { :data (pr-str data)
+    :timestamp (inst-ms (java.util.Date.))})
+
+(defn- deserialize-data [raw]
+  (read-string (:data raw)))
 
 (defn producer 
   "Create a producer"
   [producer-path]
   (charm/init)
-  (println (str "Created producer: " producer-path)))
+  (charm/delete-object "datoms")
+  (charm/delete-object "datomic")
+  (println (str "Created producer: " producer-path))
+  {:path (str root "/" producer-path)})
 
 (defn send! 
   "Send data to a producer"
   [producer topic data]
+  (charm/push-object (str (:path producer) "/" (name topic)) (serialize-data data))
   (println (str "Sent " data " to "  producer " under topic: " topic)))
 
 (defn consumer 
