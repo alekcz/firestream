@@ -6,7 +6,7 @@
   :dependencies [ [org.clojure/clojure "1.10.0"]
                   [org.clojure/core.async "0.4.500"]
                   [cheshire "5.9.0"]
-                  [alekcz/charmander "0.7.1"]                  
+                  [alekcz/charmander "0.8.0"]                  
                 ]
   :repl-options {:init-ns firestream.core}
   

@@ -1,11 +1,19 @@
 (ns firestream.core
   (:require [charmander.database :as charm]
+            [cheshire.core :as json]
             [clojure.core.async :as async]))
 
-(def root "streams")
+(def root "firestream")
+
+(defn make-channel 
+  ([]
+  (async/chan (async/dropping-buffer 8192)))
+  ([n]
+  (async/chan (async/dropping-buffer n))))
 
 (defn- serialize-data [data]
-  { :data (pr-str data)
+  { :message (pr-str data)
+    :processed false
     :timestamp (inst-ms (java.util.Date.))})
 
 (defn- deserialize-data [raw]
@@ -16,7 +24,7 @@
   [producer-path]
   (charm/init)
   (charm/delete-object "datoms")
-  (charm/delete-object "datomic")
+  (charm/delete-object "datomic ")
   (println (str "Created producer: " producer-path))
   {:path (str root "/" producer-path)})
 
@@ -28,16 +36,22 @@
 
 (defn consumer 
   "Create a consumer"
-  [consumer-path]
+  [consumer-path groupid channel]
   (charm/init)
-  (println (str "Created consumer:" consumer-path)))
+  (println (str "Created consumer:" consumer-path))
+  (atom {:path (str root "/" consumer-path)
+   :groupid groupid
+   :channel channel
+   :topic nil}))
 
 (defn subscribe! 
   "Send data to a producer"
   [consumer topic]
-  (println (str "Consuming data from "  consumer " under topic: " topic)))
-
+  (do 
+    (swap! consumer #(assoc % :topic (name topic)))
+    (charm/listen-to-child-added (str (:path @consumer) "/" (:topic @consumer)) (:channel @consumer))))
+      
 (defn poll! 
   "Read data from subscription"
   [consumer buffer]
-  (println (str "Consuming up to " buffer " from " consumer)))
+  (filter some? (repeatedly buffer #(async/poll! (:channel @consumer)))))
