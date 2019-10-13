@@ -17,7 +17,8 @@
     :timestamp (inst-ms (java.util.Date.))})
 
 (defn- deserialize-data [raw]
-  (read-string (:data raw)))
+  (let [data (assoc (:data raw) :id (:id raw))]
+    (assoc data :message (read-string (:message data)))))
 
 (defn producer 
   "Create a producer"
@@ -54,4 +55,4 @@
 (defn poll! 
   "Read data from subscription"
   [consumer buffer]
-  (filter some? (repeatedly buffer #(async/poll! (:channel @consumer)))))
+  (map deserialize-data (filter some? (repeatedly buffer #(async/poll! (:channel @consumer))))))
