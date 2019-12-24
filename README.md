@@ -6,7 +6,7 @@ Kafkaesque streams built on firebase
 Design and prototyping. Not suitable for any kind of usuage. 
 
 ## Design 
-`firestream` is designed to be a minimal hassle, kafakaesque streams for pico-scale applications or MVPs. Once your application is no longer pico-scale using `firestream` is a great way to ensure bad things happen. `firestream` is aimed to give your application (or business) the runway grow enough to be able to absorb the operational cost of `kafka`. 
+`firestream` is designed to provide kafakaesque streams with minimal hassle for pico-scale applications or MVPs. Once your application is no longer pico-scale using `firestream` is a great way to ensure bad things happen. `firestream` is aimed to give your application (or business) the runway grow enough to be able to absorb the operational cost of `kafka`. 
 
 ### Schema 
 At both rest and in transit all messages are stored as stringified `json` objects. `firestream` itself works in `clojure` maps. 
@@ -22,6 +22,22 @@ There is only one broker, that broker is your firebase instance. There is only c
 
 ### Interface
 The design of `firestream`'s interface is inspired by [pyr's](https://github.com/pyr) somewhat opinionated client library for `kafka` [kinsky](https://github.com/pyr/kinsky).
+
+### Firebase
+
+## Limits
+The theoreticals limits of `firestream` (i.e. running it on the biggest machine you can find) are derived by the limits of firebase as it is the broker. For pico-scale applications or MVPs it's unlikely you'll hit the limits of firebase or `firestream`. Here they are anyway:
+
+- Combined maximum number of consumers and producers: 200k
+- Maximum system throughput (reads and writes): ~100k per second
+- Maximum payload during write: 16MB
+- Maximum write speed: 64MB per second
+- Maximum payload size at rest: 10MB
+- Maximmum payload during read: 256MB
+- Maximum number of messages per topic: 75 million
+- Broker timeout: 15 minutes
+
+[Firebase usuage limits in case they change](https://firebase.google.com/docs/database/usage/limits)
 
 ## Installation
 
