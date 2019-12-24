@@ -1,6 +1,7 @@
 (ns firestream.core-test
   (:require [clojure.test :refer :all]
-            [firestream.core :as fire]))
+            [firestream.core :as fire]
+			[clojure.core.async :as async]))
 
 (deftest test-producer
 		(testing "Testing producer"
@@ -10,7 +11,8 @@
 
 (deftest test-consumer
 		(testing "Testing consumer"
-			(let [c (fire/consumer "messages")]
+			(let [channel (async/chan (async/buffer 48))
+				  c (fire/consumer "messages" "test-consumer" channel)]
 				(do
 					(is (= 1 (- 2 1)))))))          
 
@@ -23,8 +25,9 @@
 
 (deftest test-subscribe!-and-poll!
 		(testing "Testing subscribe!"
-			(let [c (fire/consumer "messages")
-            _ (fire/subscribe! c "alerts")]        
+			(let [channel (async/chan (async/buffer 48))
+				  c (fire/consumer "messages" "test-consumer" channel)
+            	  _ (fire/subscribe! c "alerts")]        
 				(do
           (fire/poll! c 10)
 					(is (= 1 (- 2 1)))))))      

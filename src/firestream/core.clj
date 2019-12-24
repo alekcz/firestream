@@ -37,11 +37,11 @@
 
 (defn consumer 
   "Create a consumer"
-  [consumer-path groupid channel]
+  [consumer-path id channel]
   (charm/init)
   (println (str "Created consumer:" consumer-path))
   (atom {:path (str root "/" consumer-path)
-   :groupid groupid
+   :groupid id
    :channel channel
    :topic nil}))
 
@@ -50,7 +50,7 @@
   [consumer topic]
   (do 
     (swap! consumer #(assoc % :topic (name topic)))
-    (charm/listen-to-child-added (str (:path @consumer) "/" (:topic @consumer)) (:channel @consumer))))
+    (charm/listen-to-child-added (str (:path @consumer) "/" (:topic @consumer)) (:channel @consumer) :order-by-key "processed" :equals false)))
       
 (defn poll! 
   "Read data from subscription"

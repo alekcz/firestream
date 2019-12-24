@@ -2,7 +2,30 @@
 
 Kafkaesque streams built on firebase
 
+## Status
+Design and prototyping. Not suitable for any kind of usuage. 
+
+## Design 
+`firestream` is designed to be a minimal hassle, kafakaesque streams for pico-scale applications or MVPs. Once your application is no longer pico-scale using `firestream` is a great way to ensure bad things happen. `firestream` is aimed to give your application (or business) the runway grow enough to be able to absorb the operational cost of `kafka`. 
+
+### Schema 
+At both rest and in transit all messages are stored as stringified `json` objects. `firestream` itself works in `clojure` maps. 
+
+### Topics and partitions
+Partitions are not provided for in `firestream`. If you really really really need partitions, it's probably time to switch to `kafka`.
+
+### Producers and consumers
+Like `kafka`, `firestream` allows for multiple consumer and producers. It however does not allow for consumer groups. If you really really really need consumer groups, it's probably time to switch to `kafka`.
+
+### Brokers and clusters
+There is only one broker, that broker is your firebase instance. There is only cluster
+
+### Interface
+The design of `firestream`'s interface is inspired by [pyr's](https://github.com/pyr) somewhat opinionated client library for `kafka` [kinsky](https://github.com/pyr/kinsky).
+
 ## Installation
+
+You can grab `firestream` from clojars: [alekcz/charmander "0.7.1"].
 
 ### Connecting to firebase
 
@@ -17,6 +40,15 @@ Kafkaesque streams built on firebase
 ## Usage
 
 Chill, it's still early days. 
+
+
+## Metrics
+
+There are no metrics for the moment, but hopefully someday we'll get to the same level as [operatr.io](https://operatr.io/). 
+
+## What next
+
+When you outgrow `firestream` and are ready for `kafka`, hit up the awesome folks at [troywest.com](https://troywest.com/) to get you started.  
 
 ## License
 
