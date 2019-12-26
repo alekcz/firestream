@@ -15,7 +15,7 @@ At both rest and in transit all messages are stored as stringified `json` object
 Partitions are not provided for in `firestream`. If you really really really need partitions, it's probably time to switch to `kafka`.
 
 ### Producers and consumers
-Like `kafka`, `firestream` allows for multiple consumer and producers. It however does not allow for consumer groups. If you really really really need consumer groups, it's probably time to switch to `kafka`.
+Like `kafka`, `firestream` allows for multiple consumer and producers. It however only allows for consumer groups with one consumer. If you really really really need more than one consume in a consumer group, it's probably time to switch to `kafka`.
 
 ### Brokers and clusters
 There is only one broker, that broker is your firebase instance. There is only cluster
@@ -23,7 +23,12 @@ There is only one broker, that broker is your firebase instance. There is only c
 ### Interface
 The design of `firestream`'s interface is inspired by [pyr's](https://github.com/pyr) somewhat opinionated client library for `kafka` [kinsky](https://github.com/pyr/kinsky).
 
-### Firebase
+### Why firebase
+
+"Once connectivity is reestablished, we'll receive the appropriate set of events so that the client "catches up" with the current server state, without having to write any custom code." - Peeps from Firebase
+
+[Offline writes](https://firebase.google.com/docs/database/admin/save-data#section-writes-offline)
+
 
 ## Limits
 The theoreticals limits of `firestream` (i.e. running it on the biggest machine you can find) are derived by the limits of firebase as it is the broker. For pico-scale applications or MVPs it's unlikely you'll hit the limits of firebase or `firestream`. Here they are anyway:
@@ -41,13 +46,28 @@ The theoreticals limits of `firestream` (i.e. running it on the biggest machine 
 
 ## Installation
 
-You can grab `firestream` from clojars: [alekcz/charmander "0.7.1"].
+You can grab `firestream` from clojars: [alekcz/firestream "0.0.1-SNAPSHOT"].
 
-### Connecting to firebase
+
+### Setting up firebase
+
+1. You need to create a project on [firebase](https://firebase.google.com/) to get started. So do that first.
+2. Once you've created your project setup a Realtime Database.
+3. We don't want any frontends or non-admin apps to access our database, as this database will be at the core of our stream. So we need to deny all non-admin access using the [firebase securtiy rules](https://firebase.google.com/docs/database/security/quickstart). You can use the rules below.
+```json
+{
+  "rules": {
+    ".read": false, //block all non-admin reads
+    ".write": false //block all non-admin writes
+  }
+}
+```
+
+### Connecting your app to firebase
 
 1. Get the `json` file containing your creditials by following the instruction here [https://firebase.google.com/docs/admin/setup](https://firebase.google.com/docs/admin/setup)  
 
-2. Set the GOOGLE_CLOUD_PROJECT environment to the id of your project
+2. Set the GOOGLE_CLOUD_PROJECT environment to the firebase id of your project e.g. "alekcz-test"
 
 3. Set the FIREBASE_CONFIG environment variable to the contents of your `json` key file. (Sometimes it may be necessary to wrap the key contents in single quotes to escape all the special characters within it. e.g. FIREBASE_CONFIG='`contents-of-json`')
 
@@ -55,7 +75,12 @@ You can grab `firestream` from clojars: [alekcz/charmander "0.7.1"].
 
 ## Usage
 
-Chill, it's still early days. 
+The `firestream` API has 5 functions. 
+- `producer`: Create a producer
+- `send!`: Send new message to topic
+- `consumer`: Create a consumer
+- `subscribe!`: Subscribe to a topic
+- `poll!`: Read messages ready for consumption
 
 
 ## Metrics

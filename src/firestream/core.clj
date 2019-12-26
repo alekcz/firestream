@@ -1,15 +1,13 @@
 (ns firestream.core
   (:require [charmander.database :as charm]
             [cheshire.core :as json]
-            [clojure.core.async :as async]))
+            [clojure.core.async :as async]
+            [clojure.string :as str]))
 
 (def root "firestream")
 
-(defn make-channel 
-  ([]
-  (async/chan (async/dropping-buffer 8192)))
-  ([n]
-  (async/chan (async/dropping-buffer n))))
+(defn make-channel []
+  (async/chan 8192))
 
 (defn- serialize-data [data]
   { :message (pr-str data)
@@ -20,39 +18,50 @@
   (let [data (assoc (:data raw) :id (:id raw))]
     (assoc data :message (read-string (:message data)))))
 
+(defn- clean-key [dirty-key]
+  (-> (str dirty-key "")
+      (str/replace  "." "!")
+      (str/replace  "#" "!")
+      (str/replace  "$" "!")
+      (str/replace  "[" "!")
+      (str/replace  "]" "!")))
+
 (defn producer 
   "Create a producer"
-  [producer-path]
+  [config]
   (charm/init)
-  (charm/delete-object "datoms")
-  (charm/delete-object "datomic ")
-  (println (str "Created producer: " producer-path))
-  {:path (str root "/" producer-path)})
+  (let [server (clean-key (:bootstrap.servers config))]
+    (println (str "Created producer connected to: " (str root "/" server)))
+    {:path (str root "/" server)}))
 
 (defn send! 
-  "Send data to a producer"
+  "Send new message to topic"
   [producer topic data]
   (charm/push-object (str (:path producer) "/" (name topic)) (serialize-data data))
-  (println (str "Sent " data " to "  producer " under topic: " topic)))
+  (println (str "Sent " data " to "  (:path producer) " under topic: " topic)))
 
 (defn consumer 
   "Create a consumer"
-  [consumer-path id channel]
+  [config]
   (charm/init)
-  (println (str "Created consumer:" consumer-path))
-  (atom {:path (str root "/" consumer-path)
-   :groupid id
-   :channel channel
-   :topic nil}))
+  (let [consumer-path (str root "/" (clean-key (:bootstrap.servers config))) 
+        group-id (clean-key (or (:group.id config) "default"))
+        channel (make-channel)]
+    (println (str "Created consumer connected to:" consumer-path))
+   ; (atom
+    {:path consumer-path
+      :group.id group-id
+      :channel channel}))
+      ;:topics []})))
 
 (defn subscribe! 
-  "Send data to a producer"
+  "Subscribe to a topic"
   [consumer topic]
-  (do 
-    (swap! consumer #(assoc % :topic (name topic)))
-    (charm/listen-to-child-added (str (:path @consumer) "/" (:topic @consumer)) (:channel @consumer) :order-by-key "processed" :equals false)))
+    (let [path (str (:path consumer) "/" (name topic))]
+      ;(swap! consumer #(assoc % :topics (conj (:topics %) topic)))
+      (charm/listen-to-child-added path (:channel consumer) :order-by-key (str "processed") :equals false)))
       
 (defn poll! 
   "Read data from subscription"
-  [consumer buffer]
-  (map deserialize-data (filter some? (repeatedly buffer #(async/poll! (:channel @consumer))))))
+  [consumer buffer-size]
+  (map deserialize-data (filter some? (repeatedly buffer-size #(async/poll! (:channel consumer))))))

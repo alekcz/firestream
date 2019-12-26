@@ -8,7 +8,7 @@
                   [cheshire "5.9.0"]
                   [alekcz/charmander "0.8.0"]                  
                 ]
-  :repl-options {:init-ns firestream.core}
+  ;:repl-options {:init-ns firestream.core}
   
   :plugins [[lein-cloverage "1.1.2"]])
 
