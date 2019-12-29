@@ -55,7 +55,7 @@ The theoretical limits* of `firestream` (i.e. running it on the biggest machine 
 
 ## Installation
 
-You can grab `firestream` from clojars: [alekcz/firestream "0.0.1-SNAPSHOT"].
+You can grab `firestream` from clojars: [alekcz/firestream "0.1.0-SNAPSHOT"].
 
 
 ### Setting up firebase
@@ -78,7 +78,7 @@ You can grab `firestream` from clojars: [alekcz/firestream "0.0.1-SNAPSHOT"].
 
 2. Set the GOOGLE_CLOUD_PROJECT environment to the firebase id of your project e.g. "alekcz-test"
 
-3. Set the FIREBASE_CONFIG environment variable to the contents of your `json` key file. (Sometimes it may be necessary to wrap the key contents in single quotes to escape all the special characters within it. e.g. FIREBASE_CONFIG='`contents-of-json`')
+3. Set the FIREBASE_CONFIG environment variable to the contents of your `json` key file. (Sometimes it may be necessary to remove all the line breaks and wrap the key contents in single quotes to escape all the special characters within it. e.g. FIREBASE_CONFIG='`contents-of-json`')
 
 4. You're now good to go.
 
