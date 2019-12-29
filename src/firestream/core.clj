@@ -5,7 +5,7 @@
             [clojure.string :as str]
             [taoensso.timbre :as timbre]))
 
-(def root "firestream2")
+(def root "firestream")
 
 (def channel-len 8192)
 

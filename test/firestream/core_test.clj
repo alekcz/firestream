@@ -9,7 +9,7 @@
 (defn firestream-fixture [f]
 	(charm-db/init)
 	(f)
-	(charm-db/delete-object "firestream2"))
+	(charm-db/delete-object "firestream"))
 
 (deftest test-producer
 	(testing "Test: create producer"
