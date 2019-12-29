@@ -56,7 +56,7 @@ You can grab `firestream` from clojars: [alekcz/firestream "0.0.1-SNAPSHOT"].
 1. You need to create a project on [firebase](https://firebase.google.com/) to get started. So do that first.
 2. Once you've created your project setup a Realtime Database.
 3. We don't want any frontends or non-admin apps to access our database, as this database will be at the core of our stream. So we need to deny all non-admin access using the [firebase securtiy rules](https://firebase.google.com/docs/database/security/quickstart). You can use the rules below.
-```json
+```javascript
 {
   "rules": {
     ".read": false, //block all non-admin reads
