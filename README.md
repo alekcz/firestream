@@ -31,16 +31,18 @@ The design of `firestream`'s interface is inspired by [pyr's](https://github.com
 
 
 ## Limits
-The theoreticals limits of `firestream` (i.e. running it on the biggest machine you can find) are derived by the limits of firebase as it is the broker. For pico-scale applications or MVPs it's unlikely you'll hit the limits of firebase or `firestream`. Here they are anyway:
+The theoretical limits* of `firestream` (i.e. running it on the biggest machine you can find) are derived by using an 8th of the limits of firebase. For pico-scale applications or MVPs it's unlikely you'll hit the limits of firebase or `firestream`. Here they are anyway:
 
-- Combined maximum number of consumers and producers: 200k
-- Maximum system throughput (reads and writes): ~100k per second
-- Maximum payload during write: 16MB
-- Maximum write speed: 64MB per second
-- Maximum payload size at rest: 10MB
-- Maximmum payload during read: 256MB
-- Maximum number of messages per topic: 75 million
-- Broker timeout: 15 minutes
+- Combined maximum number of consumers and producers: 24k
+- Maximum system throughput (reads and writes): ~12k per second
+- Maximum payload during write: 2MB
+- Maximum write speed: 8MB per second
+- Maximum payload size at rest: 1.25MB
+- Maximmum payload during read: 32MB
+- Maximum number of messages per topic: 9 million
+- Broker timeout: 60 minutes
+
+*It's quite likely that you can get more perf than the above, but better safe than sorry.
 
 [Firebase usuage limits in case they change](https://firebase.google.com/docs/database/usage/limits)
 
