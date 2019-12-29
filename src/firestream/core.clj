@@ -43,7 +43,7 @@
   "Send new message to topic"
   [producer topic data]
   (charm/push-object (str (:path producer) "/" (name topic)) (serialize-data data))
-  (println (str "Sent " data " to "  (:path producer) " under topic: " (name topic))))
+  (println (str "Sent message to "  (:path producer) " under topic: " (name topic))))
 
 (defn consumer 
   "Create a consumer"
