@@ -215,23 +215,3 @@
 						(fire/subscribe! c2 topic)
 						(let [unread (async/<!! (:channel @c2))]	
 							(is (empty? (fire/poll! c2 10))))))))		
-
-
-
-(defn performance-sample []
-	(let [	len 1000
-			p (fire/producer {:bootstrap.servers "performance"})
-			ran {:names ["Pew pew" "Pew"] :surname "imymvystchktvcmyigcywktgxdlziuejtdndlfeunlbfpsprceingyvgdirmgyvtbuslyrcdncrgtvufufwpydprbhwunvrpavpuzowkydsqaupbusadduvyitbzozjmkvgovgscqtnsbtutrxhxjitjamatkyrmrrdxigryukbkkuhftyrbdqbasmhvxfjtythekwdlpxdglaxqcxnzcwgzlyhvpfgqvozyyqqaishecrfhcvkoitwywbxdlychbjwujsjpxxuzudksuwxuxgsljuclcevcmgyyfhshlkyhmkbmkoiwijhloaczubrgomkkapsfaudutkmubyywesaksiaaokroairrnxkgozahyqfxvulxriduzvftrhiwxzoztzydmnqbqtdawbauntoptsgwelhdvmyteidpxgyxwgurxnsbznphfvucuirhhidcnuitrktlvstosecnlxyznbvodgarjpjtymlzqtmhfwrikpdzysikemqxlsmslgjcascnbtsimptrzpaxlvecacilyzpudhtxrgahsicyzpaufqykdunhuojgxvhygaegiqmywgspgfigiqlialkmtjqrgzsgsuzctwbfookbdwrewsmlqygvxkdcsxbolqivglcxhythrszneyujknmkfxpqfymsyfmgaqwlrvxsnorwmlbtctpcktpdqcjaaqjvpdamdamneywqdffcozezdvojpwiwjigjucjflhvcahcoggnzyvbvldrgrixriwrudvusoktcxtgmajimtknoeficbowfcjyicmvvewfrzaujyfmmmgilzbiqfzegoxwxalvirtzgifeozfotvlmacjtudhogpmibzrmcrmumfawlksnweuggwmttjwatacfinefgeuckpjrkvzdesmjqjoohycnlmnjrhlszvcxhiecxvmbodpyoryhlqxygdqzmpzsxwlxmunlsqzkyrlitjbsjesijrefsfpbd"}
-			result (atom [])]			
-		(doseq [x (range len)] 
-			(swap! result conj (fire/send! p :perf ran)))	
-		(while (not= len (count @result)) (do))
-		(doseq [x @result] 
-				(let [the-future (async/<!! x)]
-					(while (false? (.isDone the-future)) (do))))))
-
-(deftest test-performance
-	(testing "Test: create producer"
-			(criterium/quick-bench (performance-sample))
-			(charm-db/delete-object (str "firestream/performance/perf"))
-			(println "donezo")))

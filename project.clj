@@ -11,6 +11,7 @@
                   [com.taoensso/timbre "4.10.0"]  
                   [criterium "0.4.5"]                
                 ]
+  :main ^:skip-aot firestream.core-benchmark
   :repl-options {:init-ns firestream.core}
   
   :plugins [[lein-cloverage "1.1.2"]])
