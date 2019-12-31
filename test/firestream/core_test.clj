@@ -101,7 +101,7 @@
 												(fire/deserialize-data (async/<!! (:channel @c))) 
 												(fire/poll! c 100)))
 							haystack '(d1 d2 d3 d4)]
-						(while (not= 3 (count result)) (do))
+						(is (= 3 (count result)))
 						(is (some? (filter #(= (:message (nth result 0)) %) haystack)))
 						(is (some? (filter #(= (:message (nth result 1)) %) haystack)))
 						(is (some? (filter #(= (:message (nth result 2)) %) haystack))))))))	
@@ -125,7 +125,7 @@
 												(fire/deserialize-data (async/<!! (:channel @c))) 
 												(fire/poll! c 100)))
 							haystack '(d1 d2 d3 d4 d5)]
-						(while (not= 5 (count result)) (do))
+						(is (= 5 (count result)))
 						(is (some? (filter #(= (:message (nth result 0)) %) haystack)))
 						(is (some? (filter #(= (:message (nth result 1)) %) haystack)))
 						(is (some? (filter #(= (:message (nth result 2)) %) haystack)))
