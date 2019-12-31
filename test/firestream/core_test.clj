@@ -62,7 +62,6 @@
 						(is (some? (filter #(= (:message (nth result 2)) %) haystack)))
 						(is (some? (filter #(= (:message (nth result 3)) %) haystack))))))))
 
-
 (deftest test-subscribe!
 	(testing "Test: subscription"
 		(let [	server (str (uuid/v1)) 
