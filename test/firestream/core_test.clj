@@ -97,14 +97,10 @@
 						s3 (fire/send! p topic2 d3)
 						s4 (fire/send! p topic d4)
 						_ (fire/subscribe! c topic)]
-					(let [	result (flatten (conj []
-												(fire/deserialize-data (async/<!! (:channel @c))) 
-												(fire/poll! c 100)))
-							haystack '(d1 d2 d3 d4)]
-						(is (= 3 (count result)))
-						(is (some? (filter #(= (:message (nth result 0)) %) haystack)))
-						(is (some? (filter #(= (:message (nth result 1)) %) haystack)))
-						(is (some? (filter #(= (:message (nth result 2)) %) haystack))))))))	
+					(let [haystack '(d1 d2 d3 d4)]
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack)))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack)))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack))))))))	
 
 (deftest test-subscribe-3!
 	(testing "Test: subscription to multiple topics"
@@ -121,16 +117,12 @@
 						s5 (fire/send! p topic d5)
 						_ (fire/subscribe! c topic)
 						_ (fire/subscribe! c topic2)]
-					(let [	result (flatten (conj []
-												(fire/deserialize-data (async/<!! (:channel @c))) 
-												(fire/poll! c 100)))
-							haystack '(d1 d2 d3 d4 d5)]
-						(is (= 5 (count result)))
-						(is (some? (filter #(= (:message (nth result 0)) %) haystack)))
-						(is (some? (filter #(= (:message (nth result 1)) %) haystack)))
-						(is (some? (filter #(= (:message (nth result 2)) %) haystack)))
-						(is (some? (filter #(= (:message (nth result 3)) %) haystack)))
-						(is (some? (filter #(= (:message (nth result 4)) %) haystack))))))))
+					(let [haystack '(d1 d2 d3 d4 d5)]
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack)))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack)))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack)))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack)))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack))))))))
 						
 
 (deftest test-subscribe-4!
@@ -149,13 +141,9 @@
 						s5 (fire/send! p topic3 d5)
 						_ (fire/subscribe! c topic)
 						_ (fire/subscribe! c topic2)]
-					(let [	result (flatten (conj []
-												(fire/deserialize-data (async/<!! (:channel @c))) 
-												(fire/poll! c 100)))
-							haystack '(d1 d2)]
-						(is (= 2 (count result)))
-						(is (some? (filter #(= (:message (nth result 0)) %) haystack)))
-						(is (some? (filter #(= (:message (nth result 1)) %) haystack))))))))
+					(let [haystack '(d1 d2)]
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack)))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack))))))))
 
 (deftest test-commit!
 	(testing "Test: commit offset"
