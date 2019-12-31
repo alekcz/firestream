@@ -3,7 +3,8 @@
             [cheshire.core :as json]
             [clojure.core.async :as async]
             [clojure.string :as str]
-            [taoensso.timbre :as timbre]))
+            [taoensso.timbre :as timbre]
+            [clj-uuid :as uuid]))
 
 (def root "firestream")
 
@@ -42,8 +43,7 @@
 (defn send! 
   "Send new message to topic"
   [producer topic data]
-  (charm/push-object (str (:path producer) "/" (name topic)) (serialize-data data))
-  (println (str "Sent message to "  (:path producer) " under topic: " (name topic))))
+  (async/go (charm/set-object (str (:path producer) "/" (name topic) "/" (uuid/v1)) (serialize-data data))))
 
 (defn consumer 
   "Create a consumer"
@@ -65,7 +65,6 @@
       (timbre/info  (str "Created consumer subscribed to: '" (name topic) "'"))
       (pull-topic-data! @consumer topic))
       
-
 (defn poll! 
   "Read data from subscription"
   [consumer buffer-size]
