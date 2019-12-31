@@ -78,8 +78,7 @@
   "Update offset for consumer in particular topic"
   [consumer topic firestream-object]
   (let [path (str (:path @consumer) "/" (name topic)) consumed-by (str "consumed-by-" (:group.id @consumer))]
-  (charm/update-object (str path "/" (:id firestream-object)) {(keyword consumed-by) 1})
-  (timbre/info  (str "Updated offset for consumer in topic '" (name topic) "' to " (:id firestream-object)))))
+  (charm/update-object (str path "/" (:id firestream-object)) {(keyword consumed-by) 1})))
   
 (defn shutdown! [consumer]
   (let [data (async/into [] (:channel @consumer))]
