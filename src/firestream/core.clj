@@ -52,36 +52,34 @@
   (let [consumer-path (str root "/" (clean-key (:bootstrap.servers config))) 
         group-id (clean-key (or (:group.id config) "default"))]
     (timbre/info  (str "Created consumer connected to: " consumer-path))
-    (atom
       {:path consumer-path
         :group.id group-id
         :channel (async/chan channel-len)
-        :topics []})))
+        :topics (atom [])}))
 
 (defn subscribe! 
   "Subscribe to a topic"
   [consumer topic]
-      (swap! consumer #(assoc % :topics (conj (:topics %) topic)))
+      (swap! (:topics consumer) #(conj % topic))
       (timbre/info  (str "Created consumer subscribed to: '" (name topic) "'"))
-      (pull-topic-data! @consumer topic))
+      (pull-topic-data! consumer topic))
       
 (defn poll! 
   "Read data from subscription"
   [consumer buffer-size]
-  (let [available-data (map deserialize-data (filter some? (repeatedly buffer-size #(async/poll! (:channel @consumer)))))]
+  (let [available-data (map deserialize-data (filter some? (repeatedly buffer-size #(async/poll! (:channel consumer)))))]
     (if (empty? available-data) 
-      (doseq [topic (:topics @consumer)]
-        (pull-topic-data! @consumer topic))
+      (doseq [topic (deref (:topics consumer))]
+        (pull-topic-data! consumer topic))
       available-data)))
 
 (defn commit! 
   "Update offset for consumer in particular topic"
   [consumer topic firestream-object]
-  (let [path (str (:path @consumer) "/" (name topic)) consumed-by (str "consumed-by-" (:group.id @consumer))]
+  (let [path (str (:path consumer) "/" (name topic)) consumed-by (str "consumed-by-" (:group.id consumer))]
   (charm/update-object (str path "/" (:id firestream-object)) {(keyword consumed-by) 1})))
   
 (defn shutdown! [consumer]
-  (let [data (async/into [] (:channel @consumer))]
-    (async/close! (:channel @consumer))
-    (reset! consumer nil)
+  (let [data (async/into [] (:channel consumer))]
+    (async/close! (:channel consumer))
     (timbre/info "Consumer shutdown")))

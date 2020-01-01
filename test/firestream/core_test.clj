@@ -27,22 +27,22 @@
 				topic2 (keyword (str (uuid/v1)))
 				c (fire/consumer {:bootstrap.servers server})]
 			(do
-				(is (= (str/replace (str fire/root "/" server) "." "!") (:path @c)))
-				(is (empty? (:topics @c)))
+				(is (= (str/replace (str fire/root "/" server) "." "!") (:path c)))
+				(is (empty? (deref (:topics c))))
 				(fire/subscribe! c topic)
-				(is (= 1 (count (:topics @c))))
-				(is (= topic (first (:topics @c))))
+				(is (= 1 (count (deref (:topics c)))))
+				(is (= topic (first (deref (:topics c)))))
 				(fire/subscribe! c topic2)
-				(is (= 2 (count (:topics @c))))
-				(is (= topic (first (:topics @c))))
-				(is (= topic2 (last (:topics @c))))))))
+				(is (= 2 (count (deref (:topics c)))))
+				(is (= topic (first (deref (:topics c)))))
+				(is (= topic2 (last (deref (:topics c)))))))))
 			
 (deftest test-shutdown!
 	(testing "Test: shutdown consumer"
 		(let [server (str (uuid/v1) "." (uuid/v1) ".dev")
 				c (fire/consumer {:bootstrap.servers server})]
 			(let [_ (fire/shutdown! c)]
-				(is (nil? @c))))))
+				(is (nil? (async/<!! (:channel c))))))))
 			
 (deftest test-send!
 	(testing "Test: sending message"
@@ -77,7 +77,7 @@
 						s4 (fire/send! p topic d4)
 						_ (fire/subscribe! c topic)]
 					(let [	result (flatten (conj []
-												(fire/deserialize-data (async/<!! (:channel @c))) 
+												(fire/deserialize-data (async/<!! (:channel c))) 
 												(fire/poll! c 100)))
 							haystack '(d1 d2 d3 d4)]
 						(is (some? (filter #(= (:message (nth result 0)) %) haystack)))
@@ -99,9 +99,9 @@
 						s4 (fire/send! p topic d4)
 						_ (fire/subscribe! c topic)]
 					(let [haystack '(d1 d2 d3 d4)]
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack)))
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack)))
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack))))))))	
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack)))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack)))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack))))))))	
 
 (deftest test-subscribe-3!
 	(testing "Test: subscription to multiple topics"
@@ -119,11 +119,11 @@
 						_ (fire/subscribe! c topic)
 						_ (fire/subscribe! c topic2)]
 					(let [haystack '(d1 d2 d3 d4 d5)]
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack)))
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack)))
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack)))
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack)))
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack))))))))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack)))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack)))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack)))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack)))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack))))))))
 						
 
 (deftest test-subscribe-4!
@@ -143,8 +143,8 @@
 						_ (fire/subscribe! c topic)
 						_ (fire/subscribe! c topic2)]
 					(let [haystack '(d1 d2)]
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack)))
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel @c)))) %) haystack))))))))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack)))
+						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack))))))))
 
 (deftest test-commit!
 	(testing "Test: commit offset"
@@ -164,12 +164,12 @@
 					(let [ 	_ (doseq [x (rest data)] (fire/commit! c topic x))			
 							_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)
 							data2 (sort-by :id (repeatedly 4 #(-> (async/<!! channel) fire/deserialize-data)))]
-						(is (= nil ((keyword (str "consumed-by-" (:group.id @c)))  (nth data2 0))))
-						(is (= 1 ((keyword (str "consumed-by-" (:group.id @c))) (nth data2 1))))
-						(is (= 1 ((keyword (str "consumed-by-" (:group.id @c))) (nth data2 2))))
-						(is (= 1 ((keyword (str "consumed-by-" (:group.id @c))) (nth data2 3)))))
+						(is (= nil ((keyword (str "consumed-by-" (:group.id c)))  (nth data2 0))))
+						(is (= 1 ((keyword (str "consumed-by-" (:group.id c))) (nth data2 1))))
+						(is (= 1 ((keyword (str "consumed-by-" (:group.id c))) (nth data2 2))))
+						(is (= 1 ((keyword (str "consumed-by-" (:group.id c))) (nth data2 3)))))
 						(fire/subscribe! c topic)
-						(let [unread (async/<!! (:channel @c))]	
+						(let [unread (async/<!! (:channel c))]	
 							(is (empty? (fire/poll! c 10))))))))
 
 (deftest test-commit-2!
@@ -192,16 +192,16 @@
 					(let [ 	_ (doseq [x (rest data)] (fire/commit! c2 topic x))			
 							_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)
 							data2 (sort-by :id (repeatedly 4 #(-> (async/<!! channel) fire/deserialize-data)))]
-						(is (= nil ((keyword (str "consumed-by-" (:group.id @c)))  (nth data2 0))))
-						(is (= nil ((keyword (str "consumed-by-" (:group.id @c))) (nth data2 1))))
-						(is (= nil ((keyword (str "consumed-by-" (:group.id @c))) (nth data2 2))))
-						(is (= nil ((keyword (str "consumed-by-" (:group.id @c))) (nth data2 3))))
-						(is (= nil ((keyword (str "consumed-by-" (:group.id @c2)))  (nth data2 0))))
-						(is (= 1 ((keyword (str "consumed-by-" (:group.id @c2))) (nth data2 1))))
-						(is (= 1 ((keyword (str "consumed-by-" (:group.id @c2))) (nth data2 2))))
-						(is (= 1 ((keyword (str "consumed-by-" (:group.id @c2))) (nth data2 3)))))
+						(is (= nil ((keyword (str "consumed-by-" (:group.id c)))  (nth data2 0))))
+						(is (= nil ((keyword (str "consumed-by-" (:group.id c))) (nth data2 1))))
+						(is (= nil ((keyword (str "consumed-by-" (:group.id c))) (nth data2 2))))
+						(is (= nil ((keyword (str "consumed-by-" (:group.id c))) (nth data2 3))))
+						(is (= nil ((keyword (str "consumed-by-" (:group.id c2)))  (nth data2 0))))
+						(is (= 1 ((keyword (str "consumed-by-" (:group.id c2))) (nth data2 1))))
+						(is (= 1 ((keyword (str "consumed-by-" (:group.id c2))) (nth data2 2))))
+						(is (= 1 ((keyword (str "consumed-by-" (:group.id c2))) (nth data2 3)))))
 						(fire/subscribe! c2 topic)
-						(let [unread (async/<!! (:channel @c2))]	
+						(let [unread (async/<!! (:channel c2))]	
 							(is (empty? (fire/poll! c2 10))))))))		
 
 (defn performance-sample-large []
