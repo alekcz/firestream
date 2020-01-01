@@ -205,7 +205,7 @@
 							(is (empty? (fire/poll! c2 10))))))))		
 
 (defn performance-sample-large []
-	(let [	len 100
+	(let [	len 1000
 			p (fire/producer {:bootstrap.servers "performance"})
 			ran {:names ["Pew pew" "Pew"] :surname "imymvystchktvcmyigcywktgxdlziuejtdndlfeunlbfpsprceingyvgdirmgyvtbuslyrcdncrgtvufufwpydprbhwunvrpavpuzowkydsqaupbusadduvyitbzozjmkvgovgscqtnsbtutrxhxjitjamatkyrmrrdxigryukbkkuhftyrbdqbasmhvxfjtythekwdlpxdglaxqcxnzcwgzlyhvpfgqvozyyqqaishecrfhcvkoitwywbxdlychbjwujsjpxxuzudksuwxuxgsljuclcevcmgyyfhshlkyhmkbmkoiwijhloaczubrgomkkapsfaudutkmubyywesaksiaaokroairrnxkgozahyqfxvulxriduzvftrhiwxzoztzydmnqbqtdawbauntoptsgwelhdvmyteidpxgyxwgurxnsbznphfvucuirhhidcnuitrktlvstosecnlxyznbvodgarjpjtymlzqtmhfwrikpdzysikemqxlsmslgjcascnbtsimptrzpaxlvecacilyzpudhtxrgahsicyzpaufqykdunhuojgxvhygaegiqmywgspgfigiqlialkmtjqrgzsgsuzctwbfookbdwrewsmlqygvxkdcsxbolqivglcxhythrszneyujknmkfxpqfymsyfmgaqwlrvxsnorwmlbtctpcktpdqcjaaqjvpdamdamneywqdffcozezdvojpwiwjigjucjflhvcahcoggnzyvbvldrgrixriwrudvusoktcxtgmajimtknoeficbowfcjyicmvvewfrzaujyfmmmgilzbiqfzegoxwxalvirtzgifeozfotvlmacjtudhogpmibzrmcrmumfawlksnweuggwmttjwatacfinefgeuckpjrkvzdesmjqjoohycnlmnjrhlszvcxhiecxvmbodpyoryhlqxygdqzmpzsxwlxmunlsqzkyrlitjbsjesijrefsfpbd"}
 			result (atom [])]			
@@ -213,8 +213,7 @@
 			(swap! result conj (fire/send! p :perf1 ran)))	
 		(while (not= len (count @result)) (do))
 		(doseq [x @result] 
-				(let [the-future (async/<!! x)]
-					(while (false? (.isDone the-future)) (do))))))
+			(while (false? (.isDone x)) (do)))))
 
 (defn performance-sample-small []
 	(let [	len 10000
@@ -225,13 +224,12 @@
 			(swap! result conj (fire/send! p :perf2 ran)))	
 		(while (not= len (count @result)) (do))
 		(doseq [x @result] 
-				(let [the-future (async/<!! x)]
-					(while (false? (.isDone the-future)) (do))))))
+			(while (false? (.isDone x)) (do)))))
 
 (defn -main [& args]
     (time (performance-sample-large))
 	(time (performance-sample-small))
-    (println "Starting 100 x 1KB")
+    (println "Starting 1000 x 1KB")
 	(criterium/quick-bench (performance-sample-large))
     (println "Starting 10000 x 20B")
     (criterium/quick-bench (performance-sample-small))

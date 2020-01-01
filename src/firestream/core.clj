@@ -43,7 +43,7 @@
 (defn send! 
   "Send new message to topic"
   [producer topic data]
-  (async/go (charm/set-object (str (:path producer) "/" (name topic) "/" (uuid/v1)) (serialize-data data))))
+  (charm/set-object (str (:path producer) "/" (name topic) "/" (uuid/v1)) (serialize-data data)))
 
 (defn consumer 
   "Create a consumer"
