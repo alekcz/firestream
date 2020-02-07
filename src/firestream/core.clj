@@ -94,20 +94,11 @@
 
 (defn subscribe! 
   "Subscribe to a topic"
-  [consumer topic] 
-    (swap! (:topics consumer) #(conj % topic))
-    (timbre/info  (str "Created consumer subscribed to: '" (name topic) "'"))
-    (pull-topic-data! consumer topic))
-
-(defn firestream! 
-  "Subscribe to a topic"
   [consumer topic]
-      (if (not (contains? (deref (:listeners consumer)) topic))
-        (do
-          (swap! (:topics consumer) #(conj % topic))
-          (swap! (:listeners consumer) #(conj % topic))
-          (timbre/info  (str "Created consumer subscribed (firestream) to: '" (name topic) "'"))
-          (stream-topic-data! consumer topic))))
+      (if (not (contains? (deref (:listeners consumer)) topic)) (stream-topic-data! consumer topic))        
+      (swap! (:listeners consumer) #(conj % topic))
+      (timbre/info  (str "Created consumer subscribed (firestream) to: '" (name topic) "'"))
+      (swap! (:topics consumer) #(conj % topic)))
 
 (defn poll! 
   "Read data from subscription"
