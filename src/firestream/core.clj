@@ -9,6 +9,7 @@
 (def root (atom "firestream"))
 
 (def channel-len 8192)
+(def BUFFER-SIZE 384)
 
 (defn- clean-key [dirty-key]
   (-> (keyword dirty-key)
@@ -25,31 +26,40 @@
 (defn set-root [new-root]
   (reset! root (str "firestream-" (deep-clean new-root))))
 
-(defn serialize-data [key data]
-  { :message (pr-str data)
-    :key (pr-str (or (deep-clean key) :default))
+(defn serialize-data [topic key data]
+  { :value (pr-str data)
+    :key (or (deep-clean key) "k0")
+    :topic topic
+    :partion 0
+    :offset 0
     :timestamp (inst-ms (java.util.Date.))})
 
 (defn deserialize-data [raw]
-  (let [data (-> raw :data) no-message (nil? (-> raw :data :message))]
-    (if (or (nil? data) no-message)
+  (let [data (-> raw :data) no-value (nil? (-> raw :data :value))]
+    (if (or (nil? data) no-value)
       nil
       (assoc data 
-          :message (read-string (:message data))
-          :key (read-string (:key data))
+          :value (read-string (:value data))
           :firestream-id (:id raw)))))
 
-(defn prepare-and-deserialize-data [raw]
-  (let [data (deserialize-data raw)]
-    (if (nil? data)
-      nil
-      (assoc (:message data) :firestream-id (:firestream-id data)))))
+(defn distinct-and-ordered [coll]
+  (let [unique (into #{} coll)]
+    (sort-by :firestream-id (into () unique))))
+
+(defn- get-available-data [consumer]
+  (distinct-and-ordered (filter some? (map deserialize-data (repeatedly BUFFER-SIZE #(async/poll! (:channel consumer)))))))
 
 (defn- pull-topic-data! 
   "Pull data from the topic"
   [consumer topic]
   (let [path (str (:path consumer) "/" (name topic)) not-consumed (str "consumed-by-" (:group.id consumer))]
       (charm/get-children path (:channel consumer) :order-by-child not-consumed :end-at 0)))
+
+(defn- stream-topic-data! 
+  "Stream data from the topic"
+  [consumer topic]
+  (let [path (str (:path consumer) "/" (name topic)) not-consumed (str "consumed-by-" (:group.id consumer))]
+      (charm/listen-to-child-added path (:channel consumer) :order-by-child not-consumed :end-at 0)))
 
 (defn producer 
   "Create a producer"
@@ -62,7 +72,7 @@
 (defn send! 
   "Send new message to topic"
   [producer topic key value]
-  (charm/set-object (str (:path producer) "/" (name topic) "/" (uuid/v1)) (serialize-data key value)))
+  (charm/set-object (str (:path producer) "/" (name topic) "/" (uuid/v1)) (serialize-data topic key value)))
 
 (defn consumer 
   "Create a consumer"
@@ -74,29 +84,44 @@
       {:path consumer-path
         :group.id group-id
         :channel (async/chan channel-len)
-        :topics (atom [])}))
+        :topics (atom #{})
+        :listeners (atom #{})}))
 
 (defn subscribe! 
   "Subscribe to a topic"
+  [consumer topic] 
+    (swap! (:topics consumer) #(conj % topic))
+    (timbre/info  (str "Created consumer subscribed to: '" (name topic) "'"))
+    (pull-topic-data! consumer topic))
+
+(defn firestream! 
+  "Subscribe to a topic"
   [consumer topic]
-      (swap! (:topics consumer) #(conj % topic))
-      (timbre/info  (str "Created consumer subscribed to: '" (name topic) "'"))
-      (pull-topic-data! consumer topic))
-      
+      (if (not (contains? (deref (:listeners consumer)) topic))
+        (do
+          (swap! (:topics consumer) #(conj % topic))
+          (swap! (:listeners consumer) #(conj % topic))
+          (timbre/info  (str "Created consumer subscribed (firestream) to: '" (name topic) "'"))
+          (stream-topic-data! consumer topic))))
+
 (defn poll! 
   "Read data from subscription"
-  [consumer buffer-size]
-  (let [available-data (filter some? (map prepare-and-deserialize-data  (repeatedly buffer-size #(async/poll! (:channel consumer)))))]
+  [consumer timeout]
+  (let [available-data (get-available-data consumer)]
     (if (empty? available-data) 
-      (doseq [topic (deref (:topics consumer))]
-        (pull-topic-data! consumer topic))
+      (do
+        (Thread/sleep timeout)
+        (doseq [topic (deref (:topics consumer))]
+          (pull-topic-data! consumer topic))
+        (get-available-data consumer)) 
       available-data)))
 
 (defn commit! 
   "Update offset for consumer in particular topic"
   [consumer topic firestream-object]
-  (let [path (str (:path consumer) "/" (name topic)) consumed-by (str "consumed-by-" (:group.id consumer))]
-  (charm/update-object (str path "/" (:firestream-id firestream-object)) {(keyword consumed-by) 1})))
+  (if (not (nil? firestream-object))
+    (let [path (str (:path consumer) "/" (name topic)) consumed-by (str "consumed-by-" (:group.id consumer))]
+      (charm/update-object (str path "/" (:firestream-id firestream-object)) {(keyword consumed-by) 1}))))
   
 (defn shutdown! [consumer]
   (let [data (async/into [] (:channel consumer))]
