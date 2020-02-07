@@ -10,15 +10,18 @@
 
 (defn firestream-fixture [f]
 	(charm-db/init)
+	(fire/set-root "testing")
 	(f)
-	(charm-db/delete-object "firestream"))
+	(charm-db/delete-object (deref fire/root)))
+
+(use-fixtures :once firestream-fixture)
 
 (deftest test-producer
 	(testing "Test: create producer"
 		(let [	server (str (uuid/v1) "." (uuid/v1) ".dev")
 				p (fire/producer {:bootstrap.servers server})]
 			(do
-				(is (= (str/replace (str fire/root "/" server) "." "!") (:path p)))))))
+				(is (= (str/replace (str (deref fire/root) "/" server) "." "!") (:path p)))))))
 
 (deftest test-consumer
 	(testing "Test: create consumer"
@@ -27,7 +30,7 @@
 				topic2 (keyword (str (uuid/v1)))
 				c (fire/consumer {:bootstrap.servers server})]
 			(do
-				(is (= (str/replace (str fire/root "/" server) "." "!") (:path c)))
+				(is (= (str/replace (str (deref fire/root) "/" server) "." "!") (:path c)))
 				(is (empty? (deref (:topics c))))
 				(fire/subscribe! c topic)
 				(is (= 1 (count (deref (:topics c)))))
@@ -50,40 +53,42 @@
 				p (fire/producer {:bootstrap.servers server})
 				topic (keyword (str (uuid/v1)))
 				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4}
+				key (uuid/v1)
 				channel (async/chan (async/buffer 48))]
-			(let [	s1 (fire/send! p topic d1)
-					s2 (fire/send! p topic d2)
-					s3 (fire/send! p topic d3)
-					s4 (fire/send! p topic d4)
+			(let [	s1 (fire/send! p topic key d1)
+					s2 (fire/send! p topic key d2)
+					s3 (fire/send! p topic key d3)
+					s4 (fire/send! p topic key d4)
 					_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)]
 					(let [	result (sort-by :id (repeatedly 4 #(-> (async/<!! channel) fire/deserialize-data)))
 							haystack '(d1 d2 d3 d4)]
-						(is (some? (filter #(= (:message (nth result 0)) %) haystack)))
-						(is (some? (filter #(= (:message (nth result 1)) %) haystack)))
-						(is (some? (filter #(= (:message (nth result 2)) %) haystack)))
-						(is (some? (filter #(= (:message (nth result 3)) %) haystack))))))))
+						(is (some? (filter #(= (nth result 0) %) haystack)))
+						(is (some? (filter #(= (nth result 1) %) haystack)))
+						(is (some? (filter #(= (nth result 2) %) haystack)))
+						(is (some? (filter #(= (nth result 3) %) haystack))))))))
 
 (deftest test-subscribe!
 	(testing "Test: subscription"
 		(let [	server (str (uuid/v1)) 
 				topic (keyword (str (uuid/v1)))
 				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4}
+				key (uuid/v1)
 				channel (async/chan (async/buffer 48))
 				p (fire/producer {:bootstrap.servers server})
 				c (fire/consumer {:bootstrap.servers server})]
-				(let [	s1 (fire/send! p topic d1)
-						s2 (fire/send! p topic d2)
-						s3 (fire/send! p topic d3)
-						s4 (fire/send! p topic d4)
+				(let [	s1 (fire/send! p topic key d1)
+						s2 (fire/send! p topic key d2)
+						s3 (fire/send! p topic key d3)
+						s4 (fire/send! p topic key d4)
 						_ (fire/subscribe! c topic)]
 					(let [	result (flatten (conj []
 												(fire/deserialize-data (async/<!! (:channel c))) 
 												(fire/poll! c 100)))
 							haystack '(d1 d2 d3 d4)]
-						(is (some? (filter #(= (:message (nth result 0)) %) haystack)))
-						(is (some? (filter #(= (:message (nth result 1)) %) haystack)))
-						(is (some? (filter #(= (:message (nth result 2)) %) haystack)))
-						(is (some? (filter #(= (:message (nth result 3)) %) haystack))))))))	
+						(is (some? (filter #(= (nth result 0) %) haystack)))
+						(is (some? (filter #(= (nth result 1) %) haystack)))
+						(is (some? (filter #(= (nth result 2) %) haystack)))
+						(is (some? (filter #(= (nth result 3) %) haystack))))))))	
 					
 (deftest test-subscribe-2!
 	(testing "Test: subscription 2"
@@ -91,17 +96,18 @@
 				topic  (keyword (str (uuid/v1)))
 				topic2 (keyword (str (uuid/v1)))
 				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4}
+				key (uuid/v1)
 				p (fire/producer {:bootstrap.servers server})
 				c (fire/consumer {:bootstrap.servers server})]
-				(let [	s1 (fire/send! p topic d1)
-						s2 (fire/send! p topic d2)
-						s3 (fire/send! p topic2 d3)
-						s4 (fire/send! p topic d4)
+				(let [	s1 (fire/send! p topic key d1)
+						s2 (fire/send! p topic key d2)
+						s3 (fire/send! p topic2 key d3)
+						s4 (fire/send! p topic key d4)
 						_ (fire/subscribe! c topic)]
 					(let [haystack '(d1 d2 d3 d4)]
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack)))
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack)))
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack))))))))	
+						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack)))
+						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack)))
+						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack))))))))	
 
 (deftest test-subscribe-3!
 	(testing "Test: subscription to multiple topics"
@@ -109,21 +115,22 @@
 				topic  (keyword (str (uuid/v1)))
 				topic2 (keyword (str (uuid/v1)))
 				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4} d5 {:name 5}
+				key (uuid/v1)
 				p (fire/producer {:bootstrap.servers server})
 				c (fire/consumer {:bootstrap.servers server})]
-				(let [	s1 (fire/send! p topic d1)
-						s2 (fire/send! p topic d2)
-						s3 (fire/send! p topic2 d3)
-						s4 (fire/send! p topic2 d4)
-						s5 (fire/send! p topic d5)
+				(let [	s1 (fire/send! p topic key d1)
+						s2 (fire/send! p topic key d2)
+						s3 (fire/send! p topic2 key d3)
+						s4 (fire/send! p topic2 key d4)
+						s5 (fire/send! p topic key d5)
 						_ (fire/subscribe! c topic)
 						_ (fire/subscribe! c topic2)]
 					(let [haystack '(d1 d2 d3 d4 d5)]
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack)))
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack)))
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack)))
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack)))
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack))))))))
+						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack)))
+						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack)))
+						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack)))
+						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack)))
+						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack))))))))
 						
 
 (deftest test-subscribe-4!
@@ -133,41 +140,43 @@
 				topic2 (keyword (str (uuid/v1)))
 				topic3 (keyword (str (uuid/v1)))
 				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4} d5 {:name 5}
+				key (uuid/v1)
 				p (fire/producer {:bootstrap.servers server})
 				c (fire/consumer {:bootstrap.servers server})]
-				(let [	s1 (fire/send! p topic d1)
-						s2 (fire/send! p topic2 d2)
-						s3 (fire/send! p topic3 d3)
-						s4 (fire/send! p topic3 d4)
-						s5 (fire/send! p topic3 d5)
+				(let [	s1 (fire/send! p topic key d1)
+						s2 (fire/send! p topic2 key d2)
+						s3 (fire/send! p topic3 key d3)
+						s4 (fire/send! p topic3 key d4)
+						s5 (fire/send! p topic3 key d5)
 						_ (fire/subscribe! c topic)
 						_ (fire/subscribe! c topic2)]
 					(let [haystack '(d1 d2)]
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack)))
-						(is (some? (filter #(= (:message (fire/deserialize-data (async/<!! (:channel c)))) %) haystack))))))))
+						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack)))
+						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack))))))))
 
 (deftest test-commit!
 	(testing "Test: commit offset"
 		(let [	server (str (uuid/v1)) 
 				topic (keyword (str (uuid/v1)))
 				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4}
+				key (uuid/v1)
 				channel (async/chan (async/buffer 48))
 				p (fire/producer {:bootstrap.servers server})
 				c (fire/consumer {:bootstrap.servers server})]
-				(let [	s1 (fire/send! p topic d1)
-						s2 (fire/send! p topic d2)
-						s3 (fire/send! p topic d3)
-						s4 (fire/send! p topic d4)
+				(let [	s1 (fire/send! p topic key d1)
+						s2 (fire/send! p topic key d2)
+						s3 (fire/send! p topic key d3)
+						s4 (fire/send! p topic key d4)
 					  	_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)
-						data (sort-by :id (repeatedly 4 #(-> (async/<!! channel) fire/deserialize-data)))]
+						data (sort-by :id (repeatedly 4 #(async/<!! channel)))]
 					
-					(let [ 	_ (doseq [x (rest data)] (fire/commit! c topic x))			
+					(let [ 	_ (doseq [x (rest data)] (fire/commit! c topic (fire/deserialize-data x)))			
 							_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)
-							data2 (sort-by :id (repeatedly 4 #(-> (async/<!! channel) fire/deserialize-data)))]
-						(is (= nil ((keyword (str "consumed-by-" (:group.id c)))  (nth data2 0))))
-						(is (= 1 ((keyword (str "consumed-by-" (:group.id c))) (nth data2 1))))
-						(is (= 1 ((keyword (str "consumed-by-" (:group.id c))) (nth data2 2))))
-						(is (= 1 ((keyword (str "consumed-by-" (:group.id c))) (nth data2 3)))))
+							data2 (sort-by :id (repeatedly 4 #(async/<!! channel)))]
+						(is (= nil ((keyword (str "consumed-by-" (:group.id c)))  (:data (nth data2 0)))))
+						(is (= 1 ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 1)))))
+						(is (= 1 ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 2)))))
+						(is (= 1 ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 3))))))
 						(fire/subscribe! c topic)
 						(let [unread (async/<!! (:channel c))]	
 							(is (empty? (fire/poll! c 10))))))))
@@ -178,28 +187,30 @@
 				topic (keyword (str (uuid/v1)))
 				group-id (keyword (str (uuid/v1)))
 				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4}
+				key (uuid/v1)
 				channel (async/chan (async/buffer 48))
 				p (fire/producer {:bootstrap.servers server})
 				c (fire/consumer {:bootstrap.servers server})
 				c2 (fire/consumer {:bootstrap.servers server :group.id group-id})]
-				(let [	s1 (fire/send! p topic d1)
-						s2 (fire/send! p topic d2)
-						s3 (fire/send! p topic d3)
-						s4 (fire/send! p topic d4)
+				(let [	s1 (fire/send! p topic key d1)
+						s2 (fire/send! p topic key d2)
+						s3 (fire/send! p topic key d3)
+						s4 (fire/send! p topic key d4)
 					  	_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)
-						data (sort-by :id (repeatedly 4 #(-> (async/<!! channel) fire/deserialize-data)))]
+						data (sort-by :id (repeatedly 4 #(async/<!! channel)))]
 					
-					(let [ 	_ (doseq [x (rest data)] (fire/commit! c2 topic x))			
+					(let [ 	_ (doseq [x (rest data)] (fire/commit! c2 topic (fire/deserialize-data x)))			
 							_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)
-							data2 (sort-by :id (repeatedly 4 #(-> (async/<!! channel) fire/deserialize-data)))]
-						(is (= nil ((keyword (str "consumed-by-" (:group.id c)))  (nth data2 0))))
-						(is (= nil ((keyword (str "consumed-by-" (:group.id c))) (nth data2 1))))
-						(is (= nil ((keyword (str "consumed-by-" (:group.id c))) (nth data2 2))))
-						(is (= nil ((keyword (str "consumed-by-" (:group.id c))) (nth data2 3))))
-						(is (= nil ((keyword (str "consumed-by-" (:group.id c2)))  (nth data2 0))))
-						(is (= 1 ((keyword (str "consumed-by-" (:group.id c2))) (nth data2 1))))
-						(is (= 1 ((keyword (str "consumed-by-" (:group.id c2))) (nth data2 2))))
-						(is (= 1 ((keyword (str "consumed-by-" (:group.id c2))) (nth data2 3)))))
+							data2 (sort-by :id (repeatedly 4 #(async/<!! channel)))]
+						(println data2)
+						(is (= nil ((keyword (str "consumed-by-" (:group.id c)))  (:data (nth data2 0)))))
+						(is (= nil ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 1)))))
+						(is (= nil ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 2)))))
+						(is (= nil ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 3)))))
+						(is (= nil ((keyword (str "consumed-by-" (:group.id c2)))  (:data (nth data2 0)))))
+						(is (= 1 ((keyword (str "consumed-by-" (:group.id c2))) (:data (nth data2 1)))))
+						(is (= 1 ((keyword (str "consumed-by-" (:group.id c2))) (:data (nth data2 2)))))
+						(is (= 1 ((keyword (str "consumed-by-" (:group.id c2))) (:data (nth data2 3))))))
 						(fire/subscribe! c2 topic)
 						(let [unread (async/<!! (:channel c2))]	
 							(is (empty? (fire/poll! c2 10))))))))		
@@ -210,7 +221,7 @@
 			ran {:names ["Pew pew" "Pew"] :surname "imymvystchktvcmyigcywktgxdlziuejtdndlfeunlbfpsprceingyvgdirmgyvtbuslyrcdncrgtvufufwpydprbhwunvrpavpuzowkydsqaupbusadduvyitbzozjmkvgovgscqtnsbtutrxhxjitjamatkyrmrrdxigryukbkkuhftyrbdqbasmhvxfjtythekwdlpxdglaxqcxnzcwgzlyhvpfgqvozyyqqaishecrfhcvkoitwywbxdlychbjwujsjpxxuzudksuwxuxgsljuclcevcmgyyfhshlkyhmkbmkoiwijhloaczubrgomkkapsfaudutkmubyywesaksiaaokroairrnxkgozahyqfxvulxriduzvftrhiwxzoztzydmnqbqtdawbauntoptsgwelhdvmyteidpxgyxwgurxnsbznphfvucuirhhidcnuitrktlvstosecnlxyznbvodgarjpjtymlzqtmhfwrikpdzysikemqxlsmslgjcascnbtsimptrzpaxlvecacilyzpudhtxrgahsicyzpaufqykdunhuojgxvhygaegiqmywgspgfigiqlialkmtjqrgzsgsuzctwbfookbdwrewsmlqygvxkdcsxbolqivglcxhythrszneyujknmkfxpqfymsyfmgaqwlrvxsnorwmlbtctpcktpdqcjaaqjvpdamdamneywqdffcozezdvojpwiwjigjucjflhvcahcoggnzyvbvldrgrixriwrudvusoktcxtgmajimtknoeficbowfcjyicmvvewfrzaujyfmmmgilzbiqfzegoxwxalvirtzgifeozfotvlmacjtudhogpmibzrmcrmumfawlksnweuggwmttjwatacfinefgeuckpjrkvzdesmjqjoohycnlmnjrhlszvcxhiecxvmbodpyoryhlqxygdqzmpzsxwlxmunlsqzkyrlitjbsjesijrefsfpbd"}
 			result (atom [])]			
 		(doseq [x (range len)] 
-			(swap! result conj (fire/send! p :perf1 {:data (repeat 1000 ran)})))	
+			(swap! result conj (fire/send! p "perf1" nil {:data (repeat 1000 ran)})))	
 		(while (not= len (count @result)) (do))
 		(doseq [x @result] 
 			(while (false? (.isDone x)) (do)))))
@@ -221,7 +232,7 @@
 			ran {:names 1}
 			result (atom [])]			
 		(doseq [x (range len)] 
-			(swap! result conj (fire/send! p :perf2 ran)))	
+			(swap! result conj (fire/send! p "perf1" nil ran)))	
 		(while (not= len (count @result)) (do))
 		(doseq [x @result] 
 			(while (false? (.isDone x)) (do)))))

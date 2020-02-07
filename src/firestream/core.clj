@@ -6,25 +6,44 @@
             [taoensso.timbre :as timbre]
             [clj-uuid :as uuid]))
 
-(def root "firestream")
+(def root (atom "firestream"))
 
 (def channel-len 8192)
 
-(defn serialize-data [data]
-  { :message (pr-str data)
-    :timestamp (inst-ms (java.util.Date.))})
-
-(defn deserialize-data [raw]
-  (let [data (assoc (:data raw) :id (:id raw))]
-    (assoc data :message (read-string (:message data)))))
-
 (defn- clean-key [dirty-key]
-  (-> (str dirty-key "")
-      (str/replace  "." "!")
+  (-> (keyword dirty-key)
+      (name)
+      (str)(str/replace  "." "!")
       (str/replace  "#" "!")
       (str/replace  "$" "!")
       (str/replace  "[" "!")
       (str/replace  "]" "!")))
+
+(defn- deep-clean [stain]
+  (str/replace (str stain) #"^(?![a-zA-Z\d-_])" ""))
+
+(defn set-root [new-root]
+  (reset! root (str "firestream-" (deep-clean new-root))))
+
+(defn serialize-data [key data]
+  { :message (pr-str data)
+    :key (pr-str (or (deep-clean key) :default))
+    :timestamp (inst-ms (java.util.Date.))})
+
+(defn deserialize-data [raw]
+  (let [data (-> raw :data) no-message (nil? (-> raw :data :message))]
+    (if (or (nil? data) no-message)
+      nil
+      (assoc data 
+          :message (read-string (:message data))
+          :key (read-string (:key data))
+          :firestream-id (:id raw)))))
+
+(defn prepare-and-deserialize-data [raw]
+  (let [data (deserialize-data raw)]
+    (if (nil? data)
+      nil
+      (assoc (:message data) :firestream-id (:firestream-id data)))))
 
 (defn- pull-topic-data! 
   "Pull data from the topic"
@@ -37,19 +56,19 @@
   [config]
   (charm/init)
   (let [server (clean-key (:bootstrap.servers config))]
-    (timbre/info (str "Created producer connected to: " (str root "/" server)))
-    {:path (str root "/" server)}))
+    (timbre/info (str "Created producer connected to: " (str @root "/" server)))
+    {:path (str @root "/" server)}))
 
 (defn send! 
   "Send new message to topic"
-  [producer topic data]
-  (charm/set-object (str (:path producer) "/" (name topic) "/" (uuid/v1)) (serialize-data data)))
+  [producer topic key value]
+  (charm/set-object (str (:path producer) "/" (name topic) "/" (uuid/v1)) (serialize-data key value)))
 
 (defn consumer 
   "Create a consumer"
   [config]
   (charm/init)
-  (let [consumer-path (str root "/" (clean-key (:bootstrap.servers config))) 
+  (let [consumer-path (str @root "/" (clean-key (:bootstrap.servers config))) 
         group-id (clean-key (or (:group.id config) "default"))]
     (timbre/info  (str "Created consumer connected to: " consumer-path))
       {:path consumer-path
@@ -67,7 +86,7 @@
 (defn poll! 
   "Read data from subscription"
   [consumer buffer-size]
-  (let [available-data (map deserialize-data (filter some? (repeatedly buffer-size #(async/poll! (:channel consumer)))))]
+  (let [available-data (filter some? (map prepare-and-deserialize-data  (repeatedly buffer-size #(async/poll! (:channel consumer)))))]
     (if (empty? available-data) 
       (doseq [topic (deref (:topics consumer))]
         (pull-topic-data! consumer topic))
@@ -77,7 +96,7 @@
   "Update offset for consumer in particular topic"
   [consumer topic firestream-object]
   (let [path (str (:path consumer) "/" (name topic)) consumed-by (str "consumed-by-" (:group.id consumer))]
-  (charm/update-object (str path "/" (:id firestream-object)) {(keyword consumed-by) 1})))
+  (charm/update-object (str path "/" (:firestream-id firestream-object)) {(keyword consumed-by) 1})))
   
 (defn shutdown! [consumer]
   (let [data (async/into [] (:channel consumer))]
