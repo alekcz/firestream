@@ -205,12 +205,12 @@
 							(is (empty? (fire/poll! c2 10))))))))		
 
 (defn performance-sample-large []
-	(let [	len 1000
+	(let [	len 100
 			p (fire/producer {:bootstrap.servers "performance"})
 			ran {:names ["Pew pew" "Pew"] :surname "imymvystchktvcmyigcywktgxdlziuejtdndlfeunlbfpsprceingyvgdirmgyvtbuslyrcdncrgtvufufwpydprbhwunvrpavpuzowkydsqaupbusadduvyitbzozjmkvgovgscqtnsbtutrxhxjitjamatkyrmrrdxigryukbkkuhftyrbdqbasmhvxfjtythekwdlpxdglaxqcxnzcwgzlyhvpfgqvozyyqqaishecrfhcvkoitwywbxdlychbjwujsjpxxuzudksuwxuxgsljuclcevcmgyyfhshlkyhmkbmkoiwijhloaczubrgomkkapsfaudutkmubyywesaksiaaokroairrnxkgozahyqfxvulxriduzvftrhiwxzoztzydmnqbqtdawbauntoptsgwelhdvmyteidpxgyxwgurxnsbznphfvucuirhhidcnuitrktlvstosecnlxyznbvodgarjpjtymlzqtmhfwrikpdzysikemqxlsmslgjcascnbtsimptrzpaxlvecacilyzpudhtxrgahsicyzpaufqykdunhuojgxvhygaegiqmywgspgfigiqlialkmtjqrgzsgsuzctwbfookbdwrewsmlqygvxkdcsxbolqivglcxhythrszneyujknmkfxpqfymsyfmgaqwlrvxsnorwmlbtctpcktpdqcjaaqjvpdamdamneywqdffcozezdvojpwiwjigjucjflhvcahcoggnzyvbvldrgrixriwrudvusoktcxtgmajimtknoeficbowfcjyicmvvewfrzaujyfmmmgilzbiqfzegoxwxalvirtzgifeozfotvlmacjtudhogpmibzrmcrmumfawlksnweuggwmttjwatacfinefgeuckpjrkvzdesmjqjoohycnlmnjrhlszvcxhiecxvmbodpyoryhlqxygdqzmpzsxwlxmunlsqzkyrlitjbsjesijrefsfpbd"}
 			result (atom [])]			
 		(doseq [x (range len)] 
-			(swap! result conj (fire/send! p :perf1 ran)))	
+			(swap! result conj (fire/send! p :perf1 {:data (repeat 1000 ran)})))	
 		(while (not= len (count @result)) (do))
 		(doseq [x @result] 
 			(while (false? (.isDone x)) (do)))))
@@ -229,10 +229,10 @@
 (defn -main [& args]
     (time (performance-sample-large))
 	(time (performance-sample-small))
-    (println "Starting 1000 x 1KB")
-	(criterium/quick-bench (performance-sample-large))
-    (println "Starting 10000 x 20B")
-    (criterium/quick-bench (performance-sample-small))
-    (charm-db/delete-object (str "firestream/performance/perf1"))
-    (charm-db/delete-object (str "firestream/performance/perf2"))
+    ; (println "Starting 1000 x 1KB")
+	; (criterium/quick-bench (performance-sample-large))
+    ; (println "Starting 10000 x 20B")
+    ; (criterium/quick-bench (performance-sample-small))
+    ; (charm-db/delete-object (str "firestream/performance/perf1"))
+    ; (charm-db/delete-object (str "firestream/performance/perf2"))
     (println "donezo"))

@@ -38,9 +38,9 @@ The design of `firestream`'s interface is inspired by [pyr's](https://github.com
 ## Limits
 The theoretical limits* of `firestream` (i.e. running it on the biggest machine you can find) are derived by using an 8th of the limits of firebase. For pico-scale applications or MVPs it's unlikely you'll hit the limits of firebase or `firestream`. Here they are anyway:
 
-- Maximum system throughput (reads and writes): ~500 per second
+- Maximum system throughput writes: ~500 per second
 - Maximum payload during write: 2MB
-- Maximum write speed: ~0.5MB per second
+- Maximum write speed: ~1MB per second (my internet doesn't lemme test faster)
 - Maximmum data transfer per read: 200MB
 - Maximum number of messages per topic: 9 million
 
@@ -78,6 +78,29 @@ You can grab `firestream` from clojars: [alekcz/firestream "0.1.0-SNAPSHOT"].
 4. You're now good to go.
 
 ## Usage
+
+### Example
+```clojure
+(require '[firestream.core :as fire])
+
+(let [c (fire/consumer {:bootstrap.servers "stub"})
+      topic :my topic]
+      (fire/subscribe! c topic)
+      (async/go-loop [coll (fire/poll! c 100)]
+        (do
+          (if (not (empty? coll))
+            (doseq [x coll]
+              (let [y (:message x)]
+                (if (some? y)
+                  (do 
+                    (println (total-expenses (:id y)))
+                    (fire/commit! c topic x))))))
+          (Thread/sleep 2000))
+        (recur (fire/poll! c 100))))
+```
+
+
+### API
 
 The `firestream` API has 5 functions. 
 - `producer`: Create a producer

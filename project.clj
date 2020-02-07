@@ -6,7 +6,7 @@
   :dependencies [ [org.clojure/clojure "1.10.0"]
                   [org.clojure/core.async "0.4.500"]
                   [cheshire "5.9.0"]
-                  [alekcz/charmander "0.8.1"]
+                  [alekcz/charmander "0.8.3"]
                   [danlentz/clj-uuid "0.1.9"]
                   [com.taoensso/timbre "4.10.0"]  
                   [criterium "0.4.5"]                
