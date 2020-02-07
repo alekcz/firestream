@@ -47,7 +47,12 @@
     (sort-by :firestream-id (into () unique))))
 
 (defn- get-available-data [consumer]
-  (distinct-and-ordered (filter some? (map deserialize-data (repeatedly BUFFER-SIZE #(async/poll! (:channel consumer)))))))
+  (let [not-consumed (keyword (str "consumed-by-" (:group.id consumer)))]
+    (distinct-and-ordered 
+      (filter #(not (contains? % not-consumed))
+        (filter some? 
+          (map deserialize-data 
+            (repeatedly BUFFER-SIZE #(async/poll! (:channel consumer)))))))))
 
 (defn- pull-topic-data! 
   "Pull data from the topic"
