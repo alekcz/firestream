@@ -8,7 +8,7 @@ Kafkaesque streams built on firebase
 
 
 ## Status
-Design and prototyping. Not suitable for any kind of usuage. 
+Experimental. Currently in beta.
 
 ## Design 
 `firestream` is designed to provide kafakaesque streams with minimal hassle for pico-scale applications or MVPs. Once your application is no longer pico-scale using `firestream` is a great way to ensure bad things happen. `firestream` is aimed to give your application (or business) the runway grow enough to be able to absorb the operational cost of `kafka`. 
@@ -83,21 +83,18 @@ You can grab `firestream` from clojars: [alekcz/firestream "0.1.0-SNAPSHOT"].
 ```clojure
 (require '[firestream.core :as fire])
 
-(let [c (fire/consumer {:bootstrap.servers "stub"})
-      topic :my topic]
-      (fire/subscribe! c topic)
-      (async/go-loop [coll (fire/poll! c 100)]
-        (do
-          (if (not (empty? coll))
-            (doseq [x coll]
-              (let [y (:message x)]
-                (if (some? y)
-                  (do 
-                    (println (total-expenses (:id y)))
-                    (fire/commit! c topic x))))))
-          (Thread/sleep 2000))
-        (recur (fire/poll! c 100))))
+(let [c (fire/consumer {:bootstrap.servers "stub" :group.id "kafkaesque"})]
+      (fire/subscribe! c "emails")
+      (fire/poll! c 100)
 ```
+But wait there's more
+```clojure
+(require '[firestream.core :as fire])
+
+(let [c (fire/producer {:bootstrap.servers "stub"})]
+      (fire/send! p "emails" :k0 {:name "Alexander the Great" :email "alex@macedon.gr"})   
+```
+
 
 
 ### API

@@ -72,8 +72,7 @@
 					_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)]
 					(let [	needles (repeatedly 4 #(-> (async/<!! channel) :data :value read-string))
 							haystack [d1 d2 d3 d4]]
-						(println needles)
-						 (is (= (set haystack) (set needles))))))))
+						(is (= (set haystack) (set needles))))))))
 
 (deftest test-subscribe!
 	(testing "Test: subscription"
