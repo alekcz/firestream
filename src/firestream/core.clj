@@ -44,7 +44,7 @@
 
 (defn distinct-and-ordered [coll]
   (let [unique (into #{} coll)]
-    (sort-by :firestream-id (into () unique))))
+    (sort-by :timestamp (into () unique))))
 
 (defn- get-available-data [consumer]
   (let [not-consumed (keyword (str "consumed-by-" (:group.id consumer)))]
