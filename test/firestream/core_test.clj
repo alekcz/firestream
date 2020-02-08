@@ -177,10 +177,7 @@
 						(is (= nil ((keyword (str "consumed-by-" (:group.id c)))  (:data (nth data2 0)))))
 						(is (= 1 ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 1)))))
 						(is (= 1 ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 2)))))
-						(is (= 1 ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 3))))))
-						(fire/subscribe! c topic)
-						(let [unread (async/<!! (:channel c))]	
-							(is (empty? (fire/poll! c 10))))))))
+						(is (= 1 ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 3))))))))))
 
 (deftest test-commit-2!
 	(testing "Test: commit offset for wrong consumer"
@@ -203,7 +200,6 @@
 					(let [ 	_ (doseq [x (rest data)] (fire/commit! c2 topic {:firestream-id (:id x)}))			
 							_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)
 							data2 (sort-by :id (repeatedly 4 #(async/<!! channel)))]
-						(println data2)
 						(is (= nil ((keyword (str "consumed-by-" (:group.id c)))  (:data (nth data2 0)))))
 						(is (= nil ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 1)))))
 						(is (= nil ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 2)))))
@@ -211,10 +207,8 @@
 						(is (= nil ((keyword (str "consumed-by-" (:group.id c2)))  (:data (nth data2 0)))))
 						(is (= 1 ((keyword (str "consumed-by-" (:group.id c2))) (:data (nth data2 1)))))
 						(is (= 1 ((keyword (str "consumed-by-" (:group.id c2))) (:data (nth data2 2)))))
-						(is (= 1 ((keyword (str "consumed-by-" (:group.id c2))) (:data (nth data2 3))))))
-						(fire/subscribe! c2 topic)
-						(let [unread (async/<!! (:channel c2))]	
-							(is (empty? (fire/poll! c2 10))))))))		
+						(is (= 1 ((keyword (str "consumed-by-" (:group.id c2))) (:data (nth data2 3))))))))))
+							
 
 (defn performance-sample-large []
 	(let [	len 100
