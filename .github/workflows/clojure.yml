@@ -17,3 +17,11 @@ jobs:
         GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
         FIREBASE_DATABASE: ${{ secrets.FIREBASE_DATABASE }}
       run: lein test
+    - name: Calculate coverage
+      env: 
+        GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+        GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      run: |
+        lein cloverage --codecov
+        bash <(curl -s https://codecov.io/bash)

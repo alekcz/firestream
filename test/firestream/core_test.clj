@@ -16,7 +16,15 @@
 		(charm-db/delete-object (deref fire/root))
 		(Thread/sleep 500)))
 
-(use-fixtures :each firestream-fixture)
+(use-fixtures :once firestream-fixture)
+
+(defn pull-from-channel [channel]
+	(Thread/sleep 1000)
+	(let [results (for [_ (range 50)] 
+					(do
+						(Thread/sleep 50)
+						(-> (async/poll! channel) fire/deserialize-data :value)))]
+		(keep identity results)))
 
 (deftest test-producer
 	(testing "Test: create producer"
@@ -62,12 +70,10 @@
 					s3 (fire/send! p topic key d3)
 					s4 (fire/send! p topic key d4)
 					_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)]
-					(let [	result (sort-by :id (repeatedly 4 #(-> (async/<!! channel) fire/deserialize-data)))
-							haystack '(d1 d2 d3 d4)]
-						(is (some? (filter #(= (nth result 0) %) haystack)))
-						(is (some? (filter #(= (nth result 1) %) haystack)))
-						(is (some? (filter #(= (nth result 2) %) haystack)))
-						(is (some? (filter #(= (nth result 3) %) haystack))))))))
+					(let [	needles (repeatedly 4 #(-> (async/<!! channel) :data :value read-string))
+							haystack [d1 d2 d3 d4]]
+						(println needles)
+						 (is (= (set haystack) (set needles))))))))
 
 (deftest test-subscribe!
 	(testing "Test: subscription"
@@ -83,14 +89,9 @@
 						s3 (fire/send! p topic key d3)
 						s4 (fire/send! p topic key d4)
 						_ (fire/subscribe! c topic)]
-					(let [	result (flatten (conj []
-												(fire/deserialize-data (async/<!! (:channel c))) 
-												(fire/poll! c 100)))
-							haystack '(d1 d2 d3 d4)]
-						(is (some? (filter #(= (nth result 0) %) haystack)))
-						(is (some? (filter #(= (nth result 1) %) haystack)))
-						(is (some? (filter #(= (nth result 2) %) haystack)))
-						(is (some? (filter #(= (nth result 3) %) haystack))))))))	
+					(let [	needles (concat (for [n (fire/poll! c 250)] (:value n)) (pull-from-channel (:channel c)))
+							haystack [d1 d2 d3 d4]]
+						(is (= (set haystack) (set needles))))))))	
 					
 (deftest test-subscribe-2!
 	(testing "Test: subscription 2"
@@ -106,10 +107,11 @@
 						s3 (fire/send! p topic2 key d3)
 						s4 (fire/send! p topic key d4)
 						_ (fire/subscribe! c topic)]
-					(let [haystack '(d1 d2 d3 d4)]
-						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack)))
-						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack)))
-						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack))))))))	
+					(let [	needles (concat (for [n (fire/poll! c 250)] (:value n)) (pull-from-channel (:channel c)))
+							haystack [d1 d2 d4]
+							haystack2 [d1 d2 d3 d4]]
+						 (is (= (set haystack) (set needles)))
+						 (is (not= (set haystack2) (set needles))))))))
 
 (deftest test-subscribe-3!
 	(testing "Test: subscription to multiple topics"
@@ -127,12 +129,12 @@
 						s5 (fire/send! p topic key d5)
 						_ (fire/subscribe! c topic)
 						_ (fire/subscribe! c topic2)]
-					(let [haystack '(d1 d2 d3 d4 d5)]
-						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack)))
-						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack)))
-						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack)))
-						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack)))
-						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack))))))))
+					(let [	needles (concat (for [n (fire/poll! c 250)] (:value n)) 
+											(for [n (fire/poll! c 250)] (:value n)) 
+											(for [n (fire/poll! c 250)] (:value n))
+											(pull-from-channel (:channel c)))
+							haystack [d1 d2 d3 d4 d5]]
+						 (is (= (set haystack) (set needles))))))))
 						
 
 (deftest test-subscribe-4!
@@ -152,9 +154,11 @@
 						s5 (fire/send! p topic3 key d5)
 						_ (fire/subscribe! c topic)
 						_ (fire/subscribe! c topic2)]
-					(let [haystack '(d1 d2)]
-						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack)))
-						(is (some? (filter #(= (async/<!! (:channel c)) %) haystack))))))))
+					(let [	needles (concat (for [n (fire/poll! c 250)] (:value n)) (pull-from-channel (:channel c)))
+							haystack [d1 d2]
+							haystack2 [d1 d2 d3 d4 d5]]
+						 (is (= (set haystack) (set needles)))
+						 (is (not= (set haystack2) (set needles))))))))
 
 (deftest test-commit!
 	(testing "Test: commit offset"

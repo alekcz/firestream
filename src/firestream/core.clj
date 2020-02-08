@@ -9,7 +9,6 @@
 (def root (atom "firestream"))
 
 (def channel-len 8192)
-(def BUFFER-SIZE 384)
 
 (defn- clean-key [dirty-key]
   (-> (keyword dirty-key)
@@ -52,9 +51,9 @@
       (filter #(not (contains? % not-consumed))
         (filter some? 
           (map deserialize-data 
-            (repeatedly BUFFER-SIZE #(async/poll! (:channel consumer)))))))))
+            (repeatedly 100 #(async/poll! (:channel consumer)))))))))
 
-(defn- pull-topic-data! 
+(defn pull-topic-data! 
   "Pull data from the topic"
   [consumer topic]
   (let [path (str (:path consumer) "/" (name topic)) not-consumed (str "consumed-by-" (:group.id consumer))]
@@ -107,6 +106,7 @@
   (let [available-data (get-available-data consumer)]
     (if (empty? available-data) 
       (do
+        (Thread/sleep timeout)
         (doseq [topic (deref (:topics consumer))]
           (pull-topic-data! consumer topic))
         (get-available-data consumer)) 
