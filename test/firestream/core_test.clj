@@ -38,8 +38,8 @@
 				(is (= topic (first (deref (:topics c)))))
 				(fire/subscribe! c topic2)
 				(is (= 2 (count (deref (:topics c)))))
-				(is (= topic (first (deref (:topics c)))))
-				(is (= topic2 (last (deref (:topics c)))))))))
+				(is (= true (contains? (deref (:topics c)) topic)))
+				(is (= true (contains? (deref (:topics c))topic2)))))))
 			
 (deftest test-shutdown!
 	(testing "Test: shutdown consumer"
@@ -203,6 +203,7 @@
 					(let [ 	_ (doseq [x (rest data)] (fire/commit! c2 topic {:firestream-id (:id x)}))			
 							_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)
 							data2 (sort-by :id (repeatedly 4 #(async/<!! channel)))]
+						(println data2)
 						(is (= nil ((keyword (str "consumed-by-" (:group.id c)))  (:data (nth data2 0)))))
 						(is (= nil ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 1)))))
 						(is (= nil ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 2)))))
