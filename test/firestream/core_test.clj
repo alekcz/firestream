@@ -13,7 +13,8 @@
 		(charm-db/init)
 		(fire/set-root random)
 		(f)
-		(charm-db/delete-object (deref fire/root))))
+		;(charm-db/delete-object (deref fire/root)))
+		(Thread/sleep 500))
 
 (use-fixtures :once firestream-fixture)
 
