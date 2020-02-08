@@ -9,11 +9,11 @@
 	(:gen-class))
 
 (defn firestream-fixture [f]
-	(charm-db/init)
-	(fire/set-root "testing")
-	(f)
-	;(charm-db/delete-object (deref fire/root))
-	)
+	(let [random (uuid/v1)]
+		(charm-db/init)
+		(fire/set-root random)
+		(f)
+		(charm-db/delete-object (deref fire/root))))
 
 (use-fixtures :once firestream-fixture)
 
