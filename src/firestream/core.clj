@@ -44,7 +44,7 @@
 
 (defn distinct-and-ordered [coll]
   (let [unique (into #{} coll)]
-    (sort-by :timestamp (into () unique))))
+    (sort-by :firestream-id (into () unique))))
 
 (defn- get-available-data [consumer]
   (let [not-consumed (keyword (str "consumed-by-" (:group.id consumer)))]
@@ -98,7 +98,8 @@
       (if (not (contains? (deref (:listeners consumer)) topic)) (stream-topic-data! consumer topic))        
       (swap! (:listeners consumer) #(conj % topic))
       (timbre/info  (str "Created consumer subscribed (firestream) to: '" (name topic) "'"))
-      (swap! (:topics consumer) #(conj % topic)))
+      (swap! (:topics consumer) #(conj % topic))
+      (get-available-data consumer)) 
 
 (defn poll! 
   "Read data from subscription"
@@ -106,7 +107,6 @@
   (let [available-data (get-available-data consumer)]
     (if (empty? available-data) 
       (do
-        (Thread/sleep timeout)
         (doseq [topic (deref (:topics consumer))]
           (pull-topic-data! consumer topic))
         (get-available-data consumer)) 

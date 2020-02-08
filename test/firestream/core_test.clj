@@ -12,7 +12,8 @@
 	(charm-db/init)
 	(fire/set-root "testing")
 	(f)
-	(charm-db/delete-object (deref fire/root)))
+	;(charm-db/delete-object (deref fire/root))
+	)
 
 (use-fixtures :once firestream-fixture)
 
@@ -26,8 +27,8 @@
 (deftest test-consumer
 	(testing "Test: create consumer"
 		(let [	server (str (uuid/v1) "." (uuid/v1) ".dev")
-				topic (keyword (str (uuid/v1)))
-				topic2 (keyword (str (uuid/v1)))
+				topic (str (uuid/v1))
+				topic2 (str (uuid/v1))
 				c (fire/consumer {:bootstrap.servers server})]
 			(do
 				(is (= (str/replace (str (deref fire/root) "/" server) "." "!") (:path c)))
@@ -51,7 +52,7 @@
 	(testing "Test: sending message"
 		(let [server (str (uuid/v1))
 				p (fire/producer {:bootstrap.servers server})
-				topic (keyword (str (uuid/v1)))
+				topic (str (uuid/v1))
 				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4}
 				key (uuid/v1)
 				channel (async/chan (async/buffer 48))]
@@ -70,7 +71,7 @@
 (deftest test-subscribe!
 	(testing "Test: subscription"
 		(let [	server (str (uuid/v1)) 
-				topic (keyword (str (uuid/v1)))
+				topic (str (uuid/v1))
 				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4}
 				key (uuid/v1)
 				channel (async/chan (async/buffer 48))
@@ -93,8 +94,8 @@
 (deftest test-subscribe-2!
 	(testing "Test: subscription 2"
 		(let [	server (str (uuid/v1)) 
-				topic  (keyword (str (uuid/v1)))
-				topic2 (keyword (str (uuid/v1)))
+				topic  (str (uuid/v1))
+				topic2 (str (uuid/v1))
 				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4}
 				key (uuid/v1)
 				p (fire/producer {:bootstrap.servers server})
@@ -112,8 +113,8 @@
 (deftest test-subscribe-3!
 	(testing "Test: subscription to multiple topics"
 		(let [	server (str (uuid/v1)) 
-				topic  (keyword (str (uuid/v1)))
-				topic2 (keyword (str (uuid/v1)))
+				topic  (str (uuid/v1))
+				topic2 (str (uuid/v1))
 				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4} d5 {:name 5}
 				key (uuid/v1)
 				p (fire/producer {:bootstrap.servers server})
@@ -136,9 +137,9 @@
 (deftest test-subscribe-4!
 	(testing "Test: subscription to multiple topics 2"
 		(let [	server (str (uuid/v1)) 
-				topic  (keyword (str (uuid/v1)))
-				topic2 (keyword (str (uuid/v1)))
-				topic3 (keyword (str (uuid/v1)))
+				topic  (str (uuid/v1))
+				topic2 (str (uuid/v1))
+				topic3 (str (uuid/v1))
 				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4} d5 {:name 5}
 				key (uuid/v1)
 				p (fire/producer {:bootstrap.servers server})
@@ -157,7 +158,7 @@
 (deftest test-commit!
 	(testing "Test: commit offset"
 		(let [	server (str (uuid/v1)) 
-				topic (keyword (str (uuid/v1)))
+				topic (str (uuid/v1))
 				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4}
 				key (uuid/v1)
 				channel (async/chan (async/buffer 48))
@@ -170,7 +171,7 @@
 					  	_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)
 						data (sort-by :id (repeatedly 4 #(async/<!! channel)))]
 					
-					(let [ 	_ (doseq [x (rest data)] (fire/commit! c topic (fire/deserialize-data x)))			
+					(let [ 	_ (doseq [x (rest data)] (fire/commit! c topic {:firestream-id (:id x)}))			
 							_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)
 							data2 (sort-by :id (repeatedly 4 #(async/<!! channel)))]
 						(is (= nil ((keyword (str "consumed-by-" (:group.id c)))  (:data (nth data2 0)))))
@@ -184,8 +185,8 @@
 (deftest test-commit-2!
 	(testing "Test: commit offset for wrong consumer"
 		(let [	server (str (uuid/v1)) 
-				topic (keyword (str (uuid/v1)))
-				group-id (keyword (str (uuid/v1)))
+				topic  (str (uuid/v1))
+				group-id (str (uuid/v1))
 				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4}
 				key (uuid/v1)
 				channel (async/chan (async/buffer 48))
@@ -199,10 +200,9 @@
 					  	_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)
 						data (sort-by :id (repeatedly 4 #(async/<!! channel)))]
 					
-					(let [ 	_ (doseq [x (rest data)] (fire/commit! c2 topic (fire/deserialize-data x)))			
+					(let [ 	_ (doseq [x (rest data)] (fire/commit! c2 topic {:firestream-id (:id x)}))			
 							_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)
 							data2 (sort-by :id (repeatedly 4 #(async/<!! channel)))]
-						(println data2)
 						(is (= nil ((keyword (str "consumed-by-" (:group.id c)))  (:data (nth data2 0)))))
 						(is (= nil ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 1)))))
 						(is (= nil ((keyword (str "consumed-by-" (:group.id c))) (:data (nth data2 2)))))
