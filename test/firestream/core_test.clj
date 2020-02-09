@@ -100,6 +100,40 @@
 							haystack [d1 d2 d3 d4]]
 						(is (= (set haystack) (set needles))))))))
 
+(deftest test-send-unique!
+	(testing "Test: sending message with unique flag"
+		(let [server (str (uuid/v1))
+				p (fire/producer {:bootstrap.servers server})
+				topic (str (uuid/v1))
+				d1 {:name 1} d2 {:name 1} d3 {:name 1} d4 {:name 1}
+				key (uuid/v1)
+				channel (async/chan (async/buffer 48))]
+			(let [	s1 (fire/send! p topic key d1 :unique)
+					s2 (fire/send! p topic key d2 :unique)
+					s3 (fire/send! p topic key d3 :unique)
+					s4 (fire/send! p topic key d4 :unique)
+					_ (charm-db/get-object (str (:path p) "/" (name topic)) channel)]
+					(let [needles (-> (async/<!! channel) :data)]
+						(println needles)	
+						(is (= 1 (count (keys needles)))))))))						
+
+(deftest test-send-unique-2!
+	(testing "Test: sending message with unique flag"
+		(let [server (str (uuid/v1))
+				p (fire/producer {:bootstrap.servers server})
+				topic (str (uuid/v1))
+				d1 {:name 1} d2 {:name 1} d3 {:name 1} d4 {:name 1}
+				key (uuid/v1)
+				channel (async/chan (async/buffer 48))]
+			(let [	s1 (fire/send! p topic key d1 :unique)
+					s2 (fire/send! p topic key d2 :unique)
+					s3 (fire/send! p topic key d3)
+					s4 (fire/send! p topic key d4 :unique)
+					_ (charm-db/get-object (str (:path p) "/" (name topic)) channel)]
+					(let [needles (-> (async/<!! channel) :data)]
+						(println needles)	
+						(is (= 2 (count (keys needles)))))))))		
+
 (deftest test-subscribe!
 	(testing "Test: subscription"
 		(let [	server (str (uuid/v1)) 

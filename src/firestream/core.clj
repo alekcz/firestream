@@ -4,7 +4,8 @@
             [clojure.core.async :as async]
             [clojure.string :as str]
             [taoensso.timbre :as timbre]
-            [clj-uuid :as uuid]))
+            [clj-uuid :as uuid]
+            [digest :as d]))
 
 (def root (atom "firestream"))
 
@@ -75,8 +76,12 @@
 
 (defn send! 
   "Send new message to topic"
-  [producer topic key value]
-  (charm/set-object (str (:path producer) "/" (name topic) "/" (uuid/v1)) (serialize-data topic key value)))
+  ([producer topic key value]
+    (charm/set-object (str (:path producer) "/" (name topic) "/" (uuid/v1)) (serialize-data topic key value)))
+  ([producer topic key value unique]
+    (if (= unique :unique)
+      (charm/set-object (str (:path producer) "/" (name topic) "/" (d/sha-256 (pr-str value))) (serialize-data topic key value))  
+      (send! producer topic key value))))
 
 (defn consumer 
   "Create a consumer"
