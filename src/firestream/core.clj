@@ -100,21 +100,18 @@
   "Subscribe to a topic"
   [consumer topic]
       (swap! (:topics consumer) #(conj % topic))
-      (timbre/info  (str "Consumer subscribed to: '" (name topic) "'"))
       (pull-topic-data! consumer topic)) 
 
 (defn unsubscribe! 
   "Unsubscribe to a topic"
   [consumer topic]
-      (swap! (:topics consumer) #(disj % topic))
-      (timbre/info  (str "Consumer unsubscribed from: '" (name topic) "'")))
+      (swap! (:topics consumer) #(disj % topic)))
 
 (defn firestream! 
   "Subscribe to a topic with realtime updates"
   [consumer topic]
       (if (not (contains? (deref (:listeners consumer)) topic)) (stream-topic-data! consumer topic))        
       (swap! (:listeners consumer) #(conj % topic))
-      (timbre/info  (str "Consumer subscribed (firestream) to: '" (name topic) "'"))
       (swap! (:topics consumer) #(conj % topic))
       (get-available-data consumer))       
 
