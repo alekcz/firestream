@@ -94,17 +94,22 @@
 (defn subscribe! 
   "Subscribe to a topic"
   [consumer topic]
-      (timbre/info  (str "Created consumer subscribed (firestream) to: '" (name topic) "'"))
       (swap! (:topics consumer) #(conj % topic))
-      (pull-topic-data! consumer topic)
-      (get-available-data consumer)) 
+      (timbre/info  (str "Consumer subscribed to: '" (name topic) "'"))
+      (pull-topic-data! consumer topic)) 
+
+(defn unsubscribe! 
+  "Unsubscribe to a topic"
+  [consumer topic]
+      (swap! (:topics consumer) #(disj % topic))
+      (timbre/info  (str "Consumer unsubscribed from: '" (name topic) "'")))
 
 (defn firestream! 
   "Subscribe to a topic with realtime updates"
   [consumer topic]
       (if (not (contains? (deref (:listeners consumer)) topic)) (stream-topic-data! consumer topic))        
       (swap! (:listeners consumer) #(conj % topic))
-      (timbre/info  (str "Created consumer subscribed (firestream) to: '" (name topic) "'"))
+      (timbre/info  (str "Consumer subscribed (firestream) to: '" (name topic) "'"))
       (swap! (:topics consumer) #(conj % topic))
       (get-available-data consumer))       
 
@@ -129,5 +134,7 @@
   
 (defn shutdown! [consumer]
   (let [data (async/into [] (:channel consumer))]
+    (doseq [topic (deref (:topics consumer))]
+      (unsubscribe! consumer topic))
     (async/close! (:channel consumer))
     (timbre/info "Consumer shutdown")))

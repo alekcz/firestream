@@ -26,6 +26,12 @@
 						(-> (async/poll! channel) fire/deserialize-data :value)))]
 		(keep identity results)))
 
+(defn multi-poll! [c]
+	(concat (for [n (fire/poll! c 150)] (:value n))
+			(for [n (fire/poll! c 150)] (:value n))
+			(for [n (fire/poll! c 150)] (:value n))
+			(for [n (fire/poll! c 150)] (:value n))))
+ 
 (deftest test-producer
 	(testing "Test: create producer"
 		(let [	server (str (uuid/v1) "." (uuid/v1) ".dev")
@@ -54,9 +60,29 @@
 	(testing "Test: shutdown consumer"
 		(let [server (str (uuid/v1) "." (uuid/v1) ".dev")
 				c (fire/consumer {:bootstrap.servers server})]
+			(fire/subscribe! c (str (uuid/v1)))
+			(fire/subscribe! c (str (uuid/v1)))
 			(let [_ (fire/shutdown! c)]
 				(is (nil? (async/<!! (:channel c))))))))
 			
+(deftest test-unsubscribe!
+	(testing "Test: shutdown consumer"
+		(let [server (str (uuid/v1) "." (uuid/v1) ".dev")
+				c (fire/consumer {:bootstrap.servers server})
+				topic1 (str (uuid/v1))
+				topic2 (str (uuid/v1))]
+			(fire/subscribe! c topic1)
+			(fire/subscribe! c topic2)
+			(let [needles (deref (:topics c))
+				  haystack [topic1 topic2]]
+					(is (= (set haystack) (set needles))))
+			(fire/unsubscribe! c topic1)
+			(let [needles (deref (:topics c))
+				  haystack [topic1 topic2]
+				  haystack2 [topic2]]
+					(is (not= (set haystack) (set needles)))
+					(is (= (set haystack2) (set needles)))))))
+
 (deftest test-send!
 	(testing "Test: sending message"
 		(let [server (str (uuid/v1))
@@ -88,7 +114,7 @@
 						s3 (fire/send! p topic key d3)
 						s4 (fire/send! p topic key d4)
 						_ (fire/subscribe! c topic)]
-					(let [	needles (concat (for [n (fire/poll! c 250)] (:value n)) (pull-from-channel (:channel c)))
+					(let [	needles (concat (multi-poll! c) (pull-from-channel (:channel c)))
 							haystack [d1 d2 d3 d4]]
 						(is (= (set haystack) (set needles))))))))	
 					
@@ -106,7 +132,7 @@
 						s3 (fire/send! p topic2 key d3)
 						s4 (fire/send! p topic key d4)
 						_ (fire/subscribe! c topic)]
-					(let [	needles (concat (for [n (fire/poll! c 250)] (:value n)) (pull-from-channel (:channel c)))
+					(let [	needles (concat (multi-poll! c) (pull-from-channel (:channel c)))
 							haystack [d1 d2 d4]
 							haystack2 [d1 d2 d3 d4]]
 						 (is (= (set haystack) (set needles)))
@@ -125,13 +151,11 @@
 						s2 (fire/send! p topic key d2)
 						s3 (fire/send! p topic2 key d3)
 						s4 (fire/send! p topic2 key d4)
-						s5 (fire/send! p topic key d5)
-						_ (fire/subscribe! c topic)
-						_ (fire/subscribe! c topic2)]
-					(let [	needles (concat (for [n (fire/poll! c 250)] (:value n)) 
-											(for [n (fire/poll! c 250)] (:value n)) 
-											(for [n (fire/poll! c 250)] (:value n))
-											(pull-from-channel (:channel c)))
+						s5 (fire/send! p topic key d5)]
+					(Thread/sleep 1000)
+					(fire/subscribe! c topic)
+					(fire/subscribe! c topic2)
+					(let [	needles (multi-poll! c)
 							haystack [d1 d2 d3 d4 d5]]
 						 (is (= (set haystack) (set needles))))))))
 						
@@ -153,11 +177,34 @@
 						s5 (fire/send! p topic3 key d5)
 						_ (fire/subscribe! c topic)
 						_ (fire/subscribe! c topic2)]
-					(let [	needles (concat (for [n (fire/poll! c 250)] (:value n)) (pull-from-channel (:channel c)))
+					(let [	needles (concat (multi-poll! c) (pull-from-channel (:channel c)))
 							haystack [d1 d2]
 							haystack2 [d1 d2 d3 d4 d5]]
 						 (is (= (set haystack) (set needles)))
 						 (is (not= (set haystack2) (set needles))))))))
+
+(deftest test-subscribe-5!
+	(testing "Test: subscription to multiple topics 2"
+		(let [	server (str (uuid/v1)) 
+				topic  (str (uuid/v1))
+				topic2 (str (uuid/v1))
+				topic3 (str (uuid/v1))
+				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4} d5 {:name 5}
+				key (uuid/v1)
+				p (fire/producer {:bootstrap.servers server})
+				c (fire/consumer {:bootstrap.servers server})]
+				(let [	s1 (fire/send! p topic key d1)
+						s2 (fire/send! p topic2 key d2)
+						s3 (fire/send! p topic3 key d3)
+						s4 (fire/send! p topic3 key d4)
+						s5 (fire/send! p topic3 key d5)
+						_ (fire/firestream! c topic)
+						_ (fire/firestream! c topic2)]
+					(let [	needles (concat (multi-poll! c) (pull-from-channel (:channel c)))
+							haystack [d1 d2]
+							haystack2 [d1 d2 d3 d4 d5]]
+						 (is (= (set haystack) (set needles)))
+						 (is (not= (set haystack2) (set needles))))))))						 
 
 (deftest test-commit!
 	(testing "Test: commit offset"
