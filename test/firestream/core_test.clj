@@ -88,9 +88,9 @@
 				d1 {:name 1} d2 {:name 2} d3 {:name 3} d4 {:name 4}
 				key (uuid/v1)
 				channel (async/chan (async/buffer 48))
-				_ (fire/send! p topic key d1)
-				_ (fire/send! p topic key d2)
-				_ (fire/send! p topic key d3)
+				_ (fire/send! p topic key d1 :useless)
+				_ (fire/send! p topic key d2 :idle)
+				_ (fire/send! p topic key d3 :wasteful)
 				_ (fire/send! p topic key d4)
 				_ (charm-db/get-children (str (:path p) "/" (name topic)) channel)
 				needles (repeatedly 4 #(-> (async/<!! channel) :data :value read-string))
@@ -128,6 +128,22 @@
 				_ (charm-db/get-object (str (:path p) "/" (name topic)) channel)
 				needles (-> (async/<!! channel) :data)]
 					(is (= 2 (count (keys needles)))))))		
+
+(deftest test-send-unique-3!
+	(testing "Test: sending message with unique flag"
+		(let [server (str (uuid/v1))
+				p (fire/producer {:bootstrap.servers server})
+				topic (str (uuid/v1))
+				d1 {:name 1} d2 {:name 1} d3 {:name 1} d4 {:name 1}
+				key (uuid/v1)
+				channel (async/chan (async/buffer 48))
+				_ (fire/send! p topic key d1 :unique)
+				_ (fire/send! p topic key d2 :unique)
+				_ (fire/send! p topic key d3 :copycat)
+				_ (fire/send! p topic key d4 :unique)
+				_ (charm-db/get-object (str (:path p) "/" (name topic)) channel)
+				needles (-> (async/<!! channel) :data)]
+					(is (= 2 (count (keys needles)))))))	
 
 (deftest test-subscribe!
 	(testing "Test: subscription"
