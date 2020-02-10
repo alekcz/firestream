@@ -180,11 +180,11 @@
 				_ (fire/send! p topic2 key d3)
 				_ (fire/send! p topic2 key d4)
 				_ (fire/send! p topic key d5)]
-				(Thread/sleep 1000)
+				(Thread/sleep 3000)
 				(fire/subscribe! c topic)
 				(fire/subscribe! c topic2)
-				(let [	needles (multi-poll! c)
-					haystack [d1 d2 d3 d4 d5]]
+				(let [needles (multi-poll! c)
+					 haystack [d1 d2 d3 d4 d5]]
 					(is (= (set haystack) (set needles)))))))
 						
 
