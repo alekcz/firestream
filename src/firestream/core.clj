@@ -1,6 +1,5 @@
 (ns firestream.core
   (:require [charmander.database :as charm]
-            [cheshire.core :as json]
             [clojure.core.async :as async]
             [clojure.string :as str]
             [taoensso.timbre :as timbre]
@@ -110,7 +109,9 @@
 (defn firestream! 
   "Subscribe to a topic with realtime updates"
   [consumer topic]
-      (if (not (contains? (deref (:listeners consumer)) topic)) (stream-topic-data! consumer topic))        
+      (if (not (contains? (deref (:listeners consumer)) topic))
+        (stream-topic-data! consumer topic)
+        nil)        
       (swap! (:listeners consumer) #(conj % topic))
       (swap! (:topics consumer) #(conj % topic))
       (get-available-data consumer))       
@@ -132,10 +133,11 @@
   [consumer topic firestream-object]
   (if (not (nil? firestream-object))
     (let [path (str (:path consumer) "/" (name topic)) consumed-by (str "consumed-by-" (:group.id consumer))]
-      (charm/update-object (str path "/" (:firestream-id firestream-object)) {(keyword consumed-by) 1}))))
+      (charm/update-object (str path "/" (:firestream-id firestream-object)) {(keyword consumed-by) 1}))
+     nil))
   
 (defn shutdown! [consumer]
-  (let [data (async/into [] (:channel consumer))]
+  (let [_ (async/into [] (:channel consumer))]
     (doseq [topic (deref (:topics consumer))]
       (unsubscribe! consumer topic))
     (async/close! (:channel consumer))
