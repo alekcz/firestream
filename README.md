@@ -47,7 +47,8 @@ The theoretical limits* of `firestream` (i.e. running it on the biggest machine 
 
 ## Installation
 
-You can grab `firestream` from clojars: [alekcz/firestream "0.1.0-SNAPSHOT"].
+You can grab `firestream` from clojars:    
+`[alekcz/firestream "1.0.0"]`
 
 
 ### Setting up firebase
