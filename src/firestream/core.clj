@@ -10,7 +10,7 @@
 
 (set! *warn-on-reflection* 1)
 
-(def q (dq/queues "/tmp/firestream" {}))
+(def q (atom nil))
 
 (def maxi (* 9.5 1024 1024))
 
@@ -35,16 +35,49 @@
 (defn set-root [new-root]
   (reset! root (str "firestream-" (deep-clean new-root))))
 
+(defn extract-data [cluster]
+  (apply merge (map #(identity {(keyword (:id %)) (:data %)}) cluster)))
+
+(defn background-sender! []
+  (let [slots (range 10000)
+        t' (filter #(not= :timed-out %) (doall (pmap (fn [_] (dq/take! @q :firestream 0.05 :timed-out)) slots)))]
+    (when (seq t')
+      (let [t (doall (pmap #(deref %) t'))
+            clusters (vals (group-by :topic t))]
+        (doall 
+          (pmap
+            #(let [leader (first %)
+                   topic (:topic leader) p (:producer leader)
+                    _ (println leader)
+                   root (:root leader) path (str root "/" topic)
+                   dataset (extract-data %)]
+              (fire/update! (:db p) path dataset (:auth p)))
+            clusters))
+        (doall (pmap dq/complete! t'))
+        nil))
+    (count t')))
+
+(defn sender! []
+  (let [control (atom true)]
+    ; (async/go-loop []
+    ;   (try
+    ;     (background-sender!)
+    ;     (catch Exception e (.printStackTrace)))
+    ;   (when @control (recur)))
+    (fn []
+      (not (reset! control false)))))
+
 (defn producer 
   "Create a producer"
   [config]
   (let [db (:bootstrap.servers config)
-        server (uuid db)
-        auth (fire-auth/create-token (:env config))]
-    (println (str "Created producer connected to: " (str @root "/" server)))
-    {:path (str @root "/" server)
+        auth (fire-auth/create-token (:env config))
+        _ (when (nil? @q) (reset! q (dq/queues "/tmp/firestream" {})))]
+    (println (str "Created producer connected to: "  @root))
+    {:path @root
      :db db       
-     :auth auth}))
+     :auth auth
+     :shutdown (sender!)}))
 
 (defn consumer 
   "Create a consumer"
@@ -66,32 +99,33 @@
   ([producer topic key value]
     (send! producer topic key value nil))
   ([producer topic key value unique]
-    (let [noise (if (nil? unique) {:time (inst-ms (java.util.Date.)) :r (rand-int 1000)} nil)
-          id (uuid {:key key :noise nil})
+    (let [noise (if (nil? unique) {:time (str (inst-ms (java.util.Date.))) :r (str (rand-int 1000))} nil)
+          id (str (uuid {:key key :value value :noise noise}))
           task {:data (serialize id value)
                 :id id
-                :topic topic
+                :topic (name topic)
                 :root @root
-                :producer producer}]
-      (dq/put! q :firestream task))))
+                :key key
+                :producer (dissoc producer :shutdown :res)}]
+      (async/go (dq/put! @q :firestream task)))))
 
-(defn background-sender! []
-  (let [t (dq/take! q :firestream)
-        p (:producer t) data (:data t) id (:id t) root (:root t) topic (:topic t)]
-    (fire/write! (:db p) (str @root "/topics/" topic "/" id) data (:auth p))))
 
 (defn sen [p data] 
   (send! p :quotes :k0 data))
 
+(defn emptyq []
+  (count (doall (pmap dq/complete! (filter #(not= :timed-out %) (doall (pmap (fn [_] (dq/take! @q :firestream 0.05 :timed-out)) (range 10000))))))))
+
+(defn emptyf []
+  (fire/delete! "alekcz-dev" "/firestream" (fire-auth/create-token :fire)))
+
 (defn gg [n]
-  (apply merge {} (map (fn [k] {(keyword (str "t" k)) k}) (range n))))
+  (doall (pmap (fn [k] {(keyword (str "t" k)) k}) (range n))))
 
 (defn bench [p data]
-  (time 
-    (do
-      (fire/write! (:db p) (str @root "/topics") data (:auth p))
-      nil)))
-  ;(time (do (doall (cp/pmap 500 #(sen c %) (range n))) nil)))
+  (time (doall (pmap #(sen p %) data)))
+  nil)
+  ;(time (do (doall (cp/pma 500 #(sen c %) (range n))) nil)))
 
 (defn pull-topic-data! 
   "Pull data from the topic"
