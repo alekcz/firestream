@@ -22,7 +22,7 @@
 	(f)
 	(let [auth (auth/create-token :fire)
         db  (:project-id auth)]
-	;	(fire/delete! db (deref f/root) auth)
+		;(fire/delete! db (deref f/root) auth)
 		(empty-cache!)))
  
 (use-fixtures :once core-fixture)	
@@ -76,12 +76,19 @@
 		(let [topic1 (keyword (mg/generate [:re #"t-3-[a-zA-Z]{10,50}$"]))
 					p (f/producer {:env :fire})
 					c (f/consumer {:env :fire :group.id "rando"})
-					datastream (map #(identity {:ha "haha" :order %}) (range 3))
+					len 20
+					mid 10
+					datastream (map #(identity {:ha "haha" :order %}) (range len))
+					split (rest (second (split-at mid datastream)))
 					_ (f/subscribe! c topic1)
-					_ (doseq [d datastream] (f/send! p topic1 :key d))
+					_ (doseq [d datastream] 
+							(f/send! p topic1 :key d)
+							(Thread/sleep 100))
 					_ (Thread/sleep 5000)
 					received (-> (f/poll! c 3000) topic1)]
 			(is (= datastream (for [r received] (:value r))))
+			(f/commit! c {:topic topic1 :offset (-> received (nth mid) :id)})
+			(is (= split (for [r (-> (f/poll! c 3000) topic1)] (:value r))))
 			(f/shutdown! p))))
 
 (deftest unsubscribe-test

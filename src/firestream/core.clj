@@ -94,8 +94,7 @@
     (send! producer topic key value nil))
   ([producer topic key value unique]
     (let [time (uuid/get-timestamp (uuid/v1))
-          noise (if (nil? unique) {:time  time :r (str (rand-int 5000))} nil)
-          id  (str (uuid/v1));(str (uuid {:key key :value value :noise noise}))
+          id  (str "e" time);(str (uuid {:key key :value value :noise noise}))
           task {:data (serialize value)
                 :id id
                 :topic (name topic)
@@ -138,7 +137,7 @@
                   (:auth consumer) 
                   {:query query :async true :pool fire-pool})])
         data' (-> res first vals vec)
-        data  (for [d data'] (deserialize (into {} d)))
+        data  (sort-by :id (for [d data'] (deserialize (into {} d))))
         channel (second res)]
     (if (= channel timeout-ch)
       []
