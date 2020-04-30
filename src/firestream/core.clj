@@ -5,6 +5,8 @@
             [fire.core :as fire]
             [incognito.edn :refer [read-string-safe]]
             [hasch.core :refer [uuid]]
+            [clj-uuid :as uuid]
+            [tick.alpha.api :as t]
             [durable-queue :as dq]))
 
 (set! *warn-on-reflection* 1)
@@ -15,18 +17,35 @@
 (def maxi (* 9.5 1024 1024))
 (def fire-pool (fire/connection-pool 100))
 
-(defn- serialize [id data]
-  {:data (pr-str data) :id id})
+(defn- serialize [data]
+  (pr-str data))
 
 (defn- deserialize [data']
-   {:value (read-string-safe {} (:data data'))
-    :id (:id data')})
+  (let [value (read-string-safe {} (:data data'))]
+    (-> data'
+      (dissoc :data)
+      (assoc :value value))))
 
 (defn- deep-clean [stain]
   (str/replace (str stain) #"^(?![a-zA-Z\d-_])" ""))
 
 (defn- extract-data [cluster]
-  (apply merge (map #(identity {(keyword (:id %)) (:data %)}) cluster)))
+  (apply merge (map #(identity {(keyword (:id %)) (dissoc % :producer :topic :root)}) cluster)))
+
+(defn- send-topic [cluster]
+  (let [leader (first cluster)
+        topic (:topic leader) p (:producer leader)
+        root (:root leader) path (str root "/events/" topic)
+        dataset (extract-data cluster)]
+    (fire/update! (:db p) path dataset (:auth p) {:async true :pool fire-pool})
+    (doseq [d dataset]
+      (fire/write! 
+        (:db p) 
+        (str path "/" (-> d second :id) "/received-ms") 
+        {".sv" "timestamp"} 
+        (:auth p) 
+        {:async true :pool fire-pool})
+        )))
 
 (defn- background-sender! []
   (let [slots (range 10000)
@@ -34,14 +53,7 @@
     (when (seq t')
       (let [t (doall (pmap #(deref %) t'))
             clusters (vals (group-by :topic t))]
-        (doall 
-          (pmap
-            #(let [leader (first %)
-                   topic (:topic leader) p (:producer leader)
-                   root (:root leader) path (str root "/events/" topic)
-                   dataset (extract-data %)]
-              (fire/update! (:db p) path dataset (:auth p) {:async true :pool fire-pool}))
-            clusters))
+        (doall (pmap send-topic clusters))
         (doall (pmap dq/complete! t'))
         nil))
     (count t')))
@@ -81,11 +93,13 @@
   ([producer topic key value]
     (send! producer topic key value nil))
   ([producer topic key value unique]
-    (let [noise (if (nil? unique) {:time (str (inst-ms (java.util.Date.))) :r (str (rand-int 1000))} nil)
-          id (str (uuid {:key key :value value :noise noise}))
-          task {:data (serialize id value)
+    (let [time (uuid/get-timestamp (uuid/v1))
+          noise (if (nil? unique) {:time  time :r (str (rand-int 5000))} nil)
+          id  (str (uuid/v1));(str (uuid {:key key :value value :noise noise}))
+          task {:data (serialize value)
                 :id id
                 :topic (name topic)
+                :created-ms (System/currentTimeMillis)
                 :root @root
                 :key key
                 :producer (dissoc producer :shutdown :res)}]
@@ -124,7 +138,7 @@
                   (:auth consumer) 
                   {:query query :async true :pool fire-pool})])
         data' (-> res first vals vec)
-        data (for [d data'] (deserialize (into {} d)))
+        data  (for [d data'] (deserialize (into {} d)))
         channel (second res)]
     (if (= channel timeout-ch)
       []
@@ -162,7 +176,7 @@
   (fire/update! 
     (:db consumer) 
     (str (:path consumer) "/consumers/" (:group-id consumer) "/offsets/" topic)
-    {:offset offset :metadata metadata} 
+    {:offset offset :metadata (merge {:committed-ms (System/currentTimeMillis)} metadata)} 
     (:auth consumer)
     {:async false :pool fire-pool})
   (swap! (:offsets consumer) #(assoc % ktopic offset))))

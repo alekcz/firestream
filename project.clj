@@ -10,7 +10,9 @@
                   [io.replikativ/incognito "0.2.5"]
                   [org.clojure/core.async "1.1.587"]
                   [com.climate/claypoole "1.1.4"]
-                  [factual/durable-queue "0.1.5"]]
+                  [factual/durable-queue "0.1.5"]
+                  [danlentz/clj-uuid "0.1.9"]
+                  [tick "0.4.23-alpha"]]
   :main ^:skip-aot firestream.core-test
   :repl-options {:init-ns firestream.core}
   :profiles { :dev {:dependencies [[metosin/malli "0.0.1-20200404.091302-14"]]}}
