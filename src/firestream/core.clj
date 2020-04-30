@@ -5,22 +5,21 @@
             [fire.core :as fire]
             [incognito.edn :refer [read-string-safe]]
             [hasch.core :refer [uuid]]
-            [com.climate.claypoole :as cp]
             [durable-queue :as dq]))
 
 (set! *warn-on-reflection* 1)
 
 (def q (atom nil))
 (def consumer-max (atom 16384))
-(def root (atom "/firestream"))
+(def root (atom "/firestream2"))
 (def maxi (* 9.5 1024 1024))
+(def fire-pool (fire/connection-pool 100))
 
 (defn- serialize [id data]
-  (let [data' (pr-str data) size (count data')]
-    (if (< size maxi) {:data data' :id id} (throw (Exception. (str "Maximum value size exceeded!: " size))))))
+  {:data (pr-str data) :id id})
 
-(defn- deserialize [data' & read-handlers]
-   {:value (read-string-safe (or read-handlers {}) (:data data'))
+(defn- deserialize [data']
+   {:value (read-string-safe {} (:data data'))
     :id (:id data')})
 
 (defn- deep-clean [stain]
@@ -41,7 +40,7 @@
                    topic (:topic leader) p (:producer leader)
                    root (:root leader) path (str root "/events/" topic)
                    dataset (extract-data %)]
-              (fire/update! (:db p) path dataset (:auth p)))
+              (fire/update! (:db p) path dataset (:auth p) {:async true :pool fire-pool}))
             clusters))
         (doall (pmap dq/complete! t'))
         nil))
@@ -49,24 +48,25 @@
 
 (defn- sender! []
   (let [control (atom true)]
-    (async/go-loop []
-      (try
-        (background-sender!)
-        (Thread/sleep 2000)
-        (catch Exception e (.printStackTrace e)))
-      (when @control (recur)))
+    (async/thread
+      (loop []
+        (try
+          (background-sender!)
+          (Thread/sleep 2000)
+          (catch Exception e (.printStackTrace e)))
+        (when @control (recur))))
     (fn []
       (not (reset! control false)))))
 
 (defn set-root [new-root]
-  (reset! root (str "/firestream-" (deep-clean new-root))))
+  (reset! root (str @root "-" (deep-clean new-root))))
 
 (defn producer 
   "Create a producer"
   [config]
   (let [auth (fire-auth/create-token (:env config))
         db (or (:bootstrap.servers config) (:project-id auth))]
-    (when (nil? db) 
+    (when (str/blank? db) 
       (throw (Exception. ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account")))
     (when (nil? @q) 
       (reset! q (dq/queues "/tmp/firestream" {})))
@@ -99,7 +99,7 @@
         db (or (:bootstrap.servers config) (:project-id auth))
         group-id (str (uuid (or (:group.id config) "default")))
         read-handlers (get config :read-handlers (atom {}))]
-    (when (nil? db) 
+    (when (str/blank? db) 
       (throw (Exception. ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account")))
     (println  (str "Created consumer connected to: " @root))
       {:path @root
@@ -108,20 +108,32 @@
        :offsets (atom {})
        :read-handlers read-handlers 
        :topics (atom #{})
-       :channel (async/chan (async/dropping-buffer @consumer-max))
        :auth auth}))
 
-(defn empty-firestream! [p]
-  (fire/delete! (:db p) @root (:auth p)))
 
-(defn empty-cache! []
-  (when (nil? @q) 
-      (reset! q (dq/queues "/tmp/firestream" {})))
-  (doall 
-    (pmap dq/complete! 
-      (filter #(not= :timed-out %) 
-        (doall (pmap (fn [_] 
-          (dq/take! @q :firestream 0.05 :timed-out)) (range 100000)))))))
+(defn- fetch-topic [consumer topic timeout]
+  (let [timeout-ch (async/timeout timeout) 
+        offset' (-> consumer :offsets deref topic)
+        offset (or (:offset offset') offset')
+        query (if (nil? offset) {:orderBy "$key"} {:orderBy "$key" :startAt (name offset)})
+        res (async/alts!! 
+              [timeout-ch 
+              (fire/read 
+                  (:db consumer) 
+                  (str (:path consumer) "/events/" (name topic)) 
+                  (:auth consumer) 
+                  {:query query :async true :pool fire-pool})])
+        data' (-> res first vals vec)
+        data (for [d data'] (deserialize (into {} d)))
+        channel (second res)]
+    (if (= channel timeout-ch)
+      []
+      (if (nil? offset) data (rest data)))))
+
+(defn poll! 
+  "Read data from subscription"
+  [consumer timeout]
+  (apply merge {} (map #(identity {% (fetch-topic consumer % timeout)}) (deref (:topics consumer)))))
 
 (defn subscribe! 
   "Subscribe to a topic"
@@ -129,39 +141,16 @@
   (let [topic (name topic)
         ktopic (keyword topic)
         offset (fire/read (:db consumer) 
-                  (str (:path consumer) "/consumers/" (:group-id consumer) "/offsets/" topic) (:auth consumer))]
+                  (str (:path consumer) "/consumers/" (:group-id consumer) "/offsets/" topic) (:auth consumer)
+                  {:pool fire-pool})]
   (swap! (:topics consumer) #(conj % ktopic))
-  (swap! (:offsets consumer) #(assoc % ktopic offset))))
+  (swap! (:offsets consumer) #(assoc % ktopic offset))
+  (fetch-topic consumer ktopic 1000)))
 
 (defn unsubscribe! 
   "Unsubscribe to a topic"
   [consumer topic]
     (swap! (:topics consumer) #(disj % topic)))
-
-(defn- fetch-topic [consumer topic timeout]
-  (let [timeout-ch (async/timeout timeout) 
-        chan (:channel consumer)
-        [val source] (async/alts!! [timeout-ch chan])
-        offset (-> consumer :offsets deref topic :offset)
-        query (if (nil? offset) {} {:orderBy "$key" :startAt (name offset)})
-        _ (println query)]
-    (when (= source timeout-ch)
-      (async/go 
-        (let [resp  (vals 
-                      (fire/read 
-                        (:db consumer) 
-                        (str (:path consumer) "/events/" (name topic)) 
-                        (:auth consumer) 
-                        query))
-              sorted (sort-by :id resp)
-              final (if (nil? offset) sorted (rest sorted))]
-          (async/>!! chan (into [] final)))))
-    (if (nil? val) [] val)))
-
-(defn poll! 
-  "Read data from subscription"
-  [consumer timeout]
-  (apply merge {} (map #(identity {% (fetch-topic consumer % timeout)}) (deref (:topics consumer)))))
 
 (defn commit! 
   "Update offset for consumer in particular topic"
@@ -174,10 +163,12 @@
     (:db consumer) 
     (str (:path consumer) "/consumers/" (:group-id consumer) "/offsets/" topic)
     {:offset offset :metadata metadata} 
-    (:auth consumer))
+    (:auth consumer)
+    {:async false :pool fire-pool})
   (swap! (:offsets consumer) #(assoc % ktopic offset))))
   
 (defn shutdown!
   "Shutdown producer background thread"
   [producer]
   ((:shutdown producer)))
+  
