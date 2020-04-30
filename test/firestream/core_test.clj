@@ -22,7 +22,7 @@
 	(f)
 	(let [auth (auth/create-token :fire)
         db  (:project-id auth)]
-		;(fire/delete! db (deref f/root) auth)
+		(fire/delete! db (deref f/root) auth)
 		(empty-cache!)))
  
 (use-fixtures :once core-fixture)	
@@ -44,7 +44,7 @@
 			(is (empty? (-> (f/poll! c 1500) topic2)))
 			(let [data (-> (f/poll! c 1500) topic1 first)]
 				(is (= payload (-> data :value)))
-				(f/commit! c {:offset (:id data) :topic topic1 :metadata "from test"})
+				(f/commit! c {:offset (:id data) :topic topic1})
 				(is (empty? (->(f/poll! c 1500) topic1))))
 			(f/shutdown! p))))
 
@@ -66,7 +66,7 @@
 			(is (= payload (-> (f/poll! c 1500) topic2 first :value)))
 			(let [data (-> (f/poll! c 1500) topic1 first)]
 				(is (= payload (-> data :value)))
-				(f/commit! c {:offset (:id data) :topic topic1 :metadata "from test"})
+				(f/commit! c {:offset (:id data) :topic topic1})
 				(is (empty? (->(f/poll! c 1500) topic1))))
 				(is (= payload (-> (f/poll! c 1500) topic2 first :value)))
 			(f/shutdown! p))))
@@ -83,7 +83,7 @@
 					_ (f/subscribe! c topic1)
 					_ (doseq [d datastream] 
 							(f/send! p topic1 :key d)
-							(Thread/sleep 100))
+							(Thread/sleep 200))
 					_ (Thread/sleep 5000)
 					received (-> (f/poll! c 3000) topic1)]
 			(is (= datastream (for [r received] (:value r))))

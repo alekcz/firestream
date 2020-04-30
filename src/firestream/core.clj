@@ -49,12 +49,12 @@
 
 (defn- background-sender! []
   (let [slots (range 10000)
-        t' (filter #(not= :timed-out %) (doall (pmap (fn [_] (dq/take! @q :firestream 0.05 :timed-out)) slots)))]
+        t' (filter #(not= :timed-out %) (doall (map (fn [_] (dq/take! @q :firestream 0.05 :timed-out)) slots)))]
     (when (seq t')
-      (let [t (doall (pmap #(deref %) t'))
+      (let [t (doall (map #(deref %) t'))
             clusters (vals (group-by :topic t))]
-        (doall (pmap send-topic clusters))
-        (doall (pmap dq/complete! t'))
+        (doall (map send-topic clusters))
+        (doall (map dq/complete! t'))
         nil))
     (count t')))
 
@@ -94,7 +94,7 @@
     (send! producer topic key value nil))
   ([producer topic key value unique]
     (let [time (uuid/get-timestamp (uuid/v1))
-          id  (str "e" time);(str (uuid {:key key :value value :noise noise}))
+          id  (if (nil? unique) (str "e" time) (str (uuid {:key key :value value})))
           task {:data (serialize value)
                 :id id
                 :topic (name topic)
