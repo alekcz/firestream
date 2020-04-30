@@ -52,7 +52,7 @@
       (loop []
         (try
           (background-sender!)
-          (Thread/sleep 2000)
+          (Thread/sleep 500)
           (catch Exception e (.printStackTrace e)))
         (when @control (recur))))
     (fn []
@@ -102,13 +102,13 @@
     (when (str/blank? db) 
       (throw (Exception. ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account")))
     (println  (str "Created consumer connected to: " @root))
-      {:path @root
-       :group-id group-id
-       :db db
-       :offsets (atom {})
-       :read-handlers read-handlers 
-       :topics (atom #{})
-       :auth auth}))
+    {:path @root
+      :group-id group-id
+      :db db
+      :offsets (atom {})
+      :read-handlers read-handlers 
+      :topics (atom #{})
+      :auth auth}))
 
 
 (defn- fetch-topic [consumer topic timeout]

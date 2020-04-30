@@ -38,13 +38,14 @@
 					_ (f/subscribe! c topic1)
 					_ (f/send! p topic1 :key payload)
 					_ (f/send! p topic2 :key payload)
-					_ (Thread/sleep 2000)]
-			(is (= payload (-> (f/poll! c 2000) topic1 first :value)))
-			(is (empty? (-> (f/poll! c 2000) topic2)))
-			(let [data (-> (f/poll! c 2000) topic1 first)]
+					_ (Thread/sleep 1500)]
+			(is (empty? (-> (f/poll! c 1) topic1)))
+			(is (= payload (-> (f/poll! c 1500) topic1 first :value)))
+			(is (empty? (-> (f/poll! c 1500) topic2)))
+			(let [data (-> (f/poll! c 1500) topic1 first)]
 				(is (= payload (-> data :value)))
 				(f/commit! c {:offset (:id data) :topic topic1 :metadata "from test"})
-				(is (empty? (->(f/poll! c 3000) topic1))))
+				(is (empty? (->(f/poll! c 1500) topic1))))
 			(f/shutdown! p))))
 
 (deftest two-topics-test
@@ -60,29 +61,28 @@
 					_ (f/subscribe! c topic2)
 					_ (f/send! p topic1 :key payload)
 					_ (f/send! p topic2 :key payload)
-					_ (Thread/sleep 2000)]
-			(is (= payload (-> (f/poll! c 2000) topic1 first :value)))
-			(is (= payload (-> (f/poll! c 2000) topic2 first :value)))
-			(let [data (-> (f/poll! c 2000) topic1 first)]
+					_ (Thread/sleep 1500)]
+			(is (= payload (-> (f/poll! c 1500) topic1 first :value)))
+			(is (= payload (-> (f/poll! c 1500) topic2 first :value)))
+			(let [data (-> (f/poll! c 1500) topic1 first)]
 				(is (= payload (-> data :value)))
 				(f/commit! c {:offset (:id data) :topic topic1 :metadata "from test"})
-				(is (empty? (->(f/poll! c 3000) topic1))))
-				(is (= payload (-> (f/poll! c 2000) topic2 first :value)))
+				(is (empty? (->(f/poll! c 1500) topic1))))
+				(is (= payload (-> (f/poll! c 1500) topic2 first :value)))
 			(f/shutdown! p))))
 
 (deftest unsubscribe-test
 	(testing "Unsubscribe"
 		(let [topic1 (keyword (mg/generate [:re #"t-3-[a-zA-Z]{10,50}$"]))
 					p (f/producer {:env :fire})
-					c (f/consumer {:env :fire})
+					c (f/consumer {:env :fire :group.id "rando"})
 					payload {:ha "haha"}
 					_ (f/subscribe! c topic1)
 					_ (f/send! p topic1 :key payload)
-					_ (Thread/sleep 3000)]
-			(is (= payload (-> (f/poll! c 10000) topic1 first :value)))
-			(Thread/sleep 3000)
+					_ (Thread/sleep 1500)]
+			(is (= payload (-> (f/poll! c 1500) topic1 first :value)))
 			(f/unsubscribe! c topic1)
-			(is (empty? (->(f/poll! c 2000) topic1 first :value)))
+			(is (empty? (->(f/poll! c 1500) topic1 first :value)))
 			(f/shutdown! p))))
 
 (deftest unique-test
@@ -96,8 +96,8 @@
 					_ (f/send! p topic1 :key payload :unique)
 					_ (f/send! p topic1 :key payload :unique)
 					_ (f/send! p topic1 :key payload :unique)
-					_ (Thread/sleep 3000)]
-			(is (= 1 (-> (f/poll! c 5000) topic1 count)))
+					_ (Thread/sleep 1500)]
+			(is (= 1 (-> (f/poll! c 1500) topic1 count)))
 			(f/shutdown! p))))
 
 (deftest exceptions-test
