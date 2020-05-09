@@ -76,14 +76,14 @@
 		(let [topic1 (keyword (mg/generate [:re #"t-3-[a-zA-Z]{10,50}$"]))
 					p (f/producer {:env :fire})
 					c (f/consumer {:env :fire :group.id "rando"})
-					len 20
-					mid 10
+					len 40
+					mid  20
 					datastream (map #(identity {:ha "haha" :order %}) (range len))
 					split (rest (second (split-at mid datastream)))
 					_ (f/subscribe! c topic1)
 					_ (doseq [d datastream] 
 							(f/send! p topic1 :key d)
-							(Thread/sleep 200))
+							(Thread/sleep 100))
 					_ (Thread/sleep 5000)
 					received (-> (f/poll! c 3000) topic1)]
 			(is (= datastream (for [r received] (:value r))))

@@ -6,8 +6,8 @@
             [incognito.edn :refer [read-string-safe]]
             [hasch.core :refer [uuid]]
             [clj-uuid :as uuid]
-            [tick.alpha.api :as t]
-            [durable-queue :as dq]))
+            [durable-queue :as dq]
+            [taoensso.timbre :as timbre]))
 
 (set! *warn-on-reflection* 1)
 
@@ -15,7 +15,6 @@
 (def consumer-max (atom 16384))
 (def root (atom "/firestream2"))
 (def maxi (* 9.5 1024 1024))
-(def fire-pool (fire/connection-pool 100))
 
 (defn- serialize [data]
   (pr-str data))
@@ -27,7 +26,7 @@
       (assoc :value value))))
 
 (defn- deep-clean [stain]
-  (str/replace (str stain) #"^(?![a-zA-Z\d-_])" ""))
+  (str/replace (str stain) #"^(?![a-zA-Z\d-:_])" ""))
 
 (defn- extract-data [cluster]
   (apply merge (map #(identity {(keyword (:id %)) (dissoc % :producer :topic :root)}) cluster)))
@@ -37,15 +36,9 @@
         topic (:topic leader) p (:producer leader)
         root (:root leader) path (str root "/events/" topic)
         dataset (extract-data cluster)]
-    (fire/update! (:db p) path dataset (:auth p) {:async true :pool fire-pool})
+    (fire/update! (:db p) path dataset (:auth p) {:async true :print "silent"})
     (doseq [d dataset]
-      (fire/write! 
-        (:db p) 
-        (str path "/" (-> d second :id) "/received-ms") 
-        {".sv" "timestamp"} 
-        (:auth p) 
-        {:async true :pool fire-pool})
-        )))
+      (fire/write! (:db p) (str path "/" (-> d second :id) "/received-ms")  {".sv" "timestamp"} (:auth p) {:async true :print "silent"}))))
 
 (defn- background-sender! []
   (let [slots (range 10000)
@@ -59,6 +52,7 @@
     (count t')))
 
 (defn- sender! []
+  (timbre/info (str "Starting producer background thread"))
   (let [control (atom true)]
     (async/thread
       (loop []
@@ -82,7 +76,7 @@
       (throw (Exception. ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account")))
     (when (nil? @q) 
       (reset! q (dq/queues "/tmp/firestream" {})))
-    (println (str "Created producer connected to: "  @root))
+    (timbre/info (str "Created producer connected to: "  db ".firebaseio.com" @root))
     {:path @root
      :db db       
      :auth auth
@@ -110,11 +104,11 @@
   [config]
   (let [auth (fire-auth/create-token (:env config))
         db (or (:bootstrap.servers config) (:project-id auth))
-        group-id (str (uuid (or (:group.id config) "default")))
+        group-id (str (deep-clean (or (:group.id config) "default")))
         read-handlers (get config :read-handlers (atom {}))]
     (when (str/blank? db) 
       (throw (Exception. ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account")))
-    (println  (str "Created consumer connected to: " @root))
+    (timbre/info (str "Created consumer connected to: "  db ".firebaseio.com" @root))
     {:path @root
       :group-id group-id
       :db db
@@ -135,7 +129,7 @@
                   (:db consumer) 
                   (str (:path consumer) "/events/" (name topic)) 
                   (:auth consumer) 
-                  {:query query :async true :pool fire-pool})])
+                  {:query query :async true})])
         data' (-> res first vals vec)
         data  (sort-by :id (for [d data'] (deserialize (into {} d))))
         channel (second res)]
@@ -154,16 +148,17 @@
   (let [topic (name topic)
         ktopic (keyword topic)
         offset (fire/read (:db consumer) 
-                  (str (:path consumer) "/consumers/" (:group-id consumer) "/offsets/" topic) (:auth consumer)
-                  {:pool fire-pool})]
+                  (str (:path consumer) "/consumers/" (:group-id consumer) "/offsets/" topic) (:auth consumer))]
   (swap! (:topics consumer) #(conj % ktopic))
   (swap! (:offsets consumer) #(assoc % ktopic offset))
+  (timbre/info (str "Consumer subscribed to: " topic))
   (fetch-topic consumer ktopic 1000)))
 
 (defn unsubscribe! 
   "Unsubscribe to a topic"
   [consumer topic]
-    (swap! (:topics consumer) #(disj % topic)))
+    (swap! (:topics consumer) #(disj % topic))
+    (timbre/info (str "Consumer unsubscribed from: " topic)))
 
 (defn commit! 
   "Update offset for consumer in particular topic"
@@ -171,17 +166,17 @@
   (let [topic (name (:topic offset-map))
         ktopic (keyword topic)
         offset (:offset offset-map)
-        metadata (:metadata offset-map)]
+        metadata (merge (:metadata offset-map) {})]
   (fire/update! 
     (:db consumer) 
     (str (:path consumer) "/consumers/" (:group-id consumer) "/offsets/" topic)
-    {:offset offset :metadata (merge {:committed-ms (System/currentTimeMillis)} metadata)} 
-    (:auth consumer)
-    {:async false :pool fire-pool})
+    {:offset offset :metadata (merge metadata  {:committed-ms (System/currentTimeMillis)})} 
+    (:auth consumer))
   (swap! (:offsets consumer) #(assoc % ktopic offset))))
   
 (defn shutdown!
   "Shutdown producer background thread"
   [producer]
+  (timbre/info (str "Shutting down producer"))
   ((:shutdown producer)))
   
