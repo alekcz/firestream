@@ -79,7 +79,7 @@
     (timbre/info (str "Created producer connected to: "  db ".firebaseio.com" @root))
     {:path @root
      :db db       
-     :auth auth
+     :auth (dissoc auth :new-token)
      :shutdown (sender!)}))
 
 (defn send! 
@@ -151,14 +151,12 @@
                   (str (:path consumer) "/consumers/" (:group-id consumer) "/offsets/" topic) (:auth consumer))]
   (swap! (:topics consumer) #(conj % ktopic))
   (swap! (:offsets consumer) #(assoc % ktopic offset))
-  (timbre/info (str "Consumer subscribed to: " topic))
   (fetch-topic consumer ktopic 1000)))
 
 (defn unsubscribe! 
   "Unsubscribe to a topic"
   [consumer topic]
-    (swap! (:topics consumer) #(disj % topic))
-    (timbre/info (str "Consumer unsubscribed from: " topic)))
+    (swap! (:topics consumer) #(disj % topic)))
 
 (defn commit! 
   "Update offset for consumer in particular topic"
