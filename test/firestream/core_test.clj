@@ -114,24 +114,24 @@
 		(is (= ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account" 
 					(try (f/consumer {:env :missing-project-id}) (catch Exception e (.getMessage e)))))))
 
-(deftest perf-test
-	(testing "Test write speed"
-		(let [topic1 (keyword (mg/generate [:re #"t-1-[a-zA-Z]{10,50}$"]))
-					p (f/producer {:env :fire})
-					c (f/consumer {:env :fire})
-					payload {:ha "haha"}
-					n 3000]
-			(f/subscribe! c topic1)
-			(doseq [num (range n)]
-				(f/send! p topic1 :key (assoc payload :n num)))
-			(Thread/sleep 10000)
-			(let [res (-> (f/poll! c 2000) topic1)
-						alpha (:created-ms (first res))
-						omega (:created-ms (last res))
-						_ (println alpha omega)
-						duration (- omega alpha)]
-				(println duration)
-				(is (> 5000 duration))
-				(is (= n (count res))))
-			(Thread/sleep 2000))))
+; (deftest perf-test
+; 	(testing "Test write speed"
+; 		(let [topic1 (keyword (mg/generate [:re #"t-1-[a-zA-Z]{10,50}$"]))
+; 					p (f/producer {:env :fire})
+; 					c (f/consumer {:env :fire})
+; 					payload {:ha "haha"}
+; 					n 3000]
+; 			(f/subscribe! c topic1)
+; 			(doseq [num (range n)]
+; 				(f/send! p topic1 :key (assoc payload :n num)))
+; 			(Thread/sleep 10000)
+; 			(let [res (-> (f/poll! c 2000) topic1)
+; 						alpha (:created-ms (first res))
+; 						omega (:created-ms (last res))
+; 						_ (println alpha omega)
+; 						duration (- omega alpha)]
+; 				(println duration)
+; 				(is (> 5000 duration))
+; 				(is (= n (count res))))
+; 			(Thread/sleep 2000))))
 			
