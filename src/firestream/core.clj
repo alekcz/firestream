@@ -5,16 +5,11 @@
             [fire.core :as fire]
             [incognito.edn :refer [read-string-safe]]
             [hasch.core :refer [uuid]]
-            [clj-uuid :as uuid]
-            [durable-queue :as dq]
-            [taoensso.timbre :as timbre]))
+            [clj-uuid :as uuid]))
 
 (set! *warn-on-reflection* 1)
 
-(def q (atom nil))
-(def consumer-max (atom 16384))
 (def root (atom "/firestream2"))
-(def maxi (* 9.5 1024 1024))
 
 (defn- serialize [data]
   (pr-str data))
@@ -28,42 +23,6 @@
 (defn- deep-clean [stain]
   (str/replace (str stain) #"^(?![a-zA-Z\d-:_])" ""))
 
-(defn- extract-data [cluster]
-  (apply merge (map #(identity {(keyword (:id %)) (dissoc % :producer :topic :root)}) cluster)))
-
-(defn- send-topic [cluster]
-  (let [leader (first cluster)
-        topic (:topic leader) p (:producer leader)
-        root (:root leader) path (str root "/events/" topic)
-        dataset (extract-data cluster)]
-    (fire/update! (:db p) path dataset (:auth p) {:async true :print "silent"})
-    (doseq [d dataset]
-      (fire/write! (:db p) (str path "/" (-> d second :id) "/received-ms")  {".sv" "timestamp"} (:auth p) {:async true :print "silent"}))))
-
-(defn- background-sender! []
-  (let [slots (range 10000)
-        t' (filter #(not= :timed-out %) (doall (map (fn [_] (dq/take! @q :firestream 0.05 :timed-out)) slots)))]
-    (when (seq t')
-      (let [t (doall (map #(deref %) t'))
-            clusters (vals (group-by :topic t))]
-        (doall (map send-topic clusters))
-        (doall (map dq/complete! t'))
-        nil))
-    (count t')))
-
-(defn- sender! []
-  (timbre/info (str "Starting producer background thread"))
-  (let [control (atom true)]
-    (async/thread
-      (loop []
-        (try
-          (background-sender!)
-          (Thread/sleep 500)
-          (catch Exception e (.printStackTrace e)))
-        (when @control (recur))))
-    (fn []
-      (not (reset! control false)))))
-
 (defn set-root [new-root]
   (reset! root (str @root "-" (deep-clean new-root))))
 
@@ -74,13 +33,10 @@
         db (or (:bootstrap.servers config) (:project-id auth))]
     (when (str/blank? db) 
       (throw (Exception. ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account")))
-    (when (nil? @q) 
-      (reset! q (dq/queues "/tmp/firestream" {})))
-    (timbre/info (str "Created producer connected to: "  db ".firebaseio.com" @root))
+    (println (str "Created producer connected to: "  db ".firebaseio.com" @root))
     {:path @root
      :db db       
-     :auth (dissoc auth :new-token)
-     :shutdown (sender!)}))
+     :auth (dissoc auth :new-token)}))
 
 (defn send! 
   "Send new message to topic"
@@ -89,15 +45,15 @@
   ([producer topic key value unique]
     (let [time (uuid/get-timestamp (uuid/v1))
           id  (if (nil? unique) (str "e" time) (str (uuid {:key key :value value})))
+          path (str @root "/events/" (name topic))
+          db (:db producer)
+          auth (:auth producer)
           task {:data (serialize value)
                 :id id
-                :topic (name topic)
                 :created-ms (System/currentTimeMillis)
-                :root @root
-                :key key
-                :producer (dissoc producer :shutdown :res)}]
-      (async/go (dq/put! @q :firestream task))
-      nil)))
+                :key key}]
+      [(fire/update! db path {id task} auth {:async true :print "silent"})
+       (fire/write! db (str path "/" id "/received-ms")  {".sv" "timestamp"} auth {:async true :print "silent"})])))
 
 (defn consumer 
   "Create a consumer"
@@ -108,7 +64,7 @@
         read-handlers (get config :read-handlers (atom {}))]
     (when (str/blank? db) 
       (throw (Exception. ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account")))
-    (timbre/info (str "Created consumer connected to: "  db ".firebaseio.com" @root))
+    (println (str "Created consumer connected to: "  db ".firebaseio.com" @root))
     {:path @root
       :group-id group-id
       :db db
@@ -171,10 +127,3 @@
     {:offset offset :metadata (merge metadata  {:committed-ms (System/currentTimeMillis)})} 
     (:auth consumer))
   (swap! (:offsets consumer) #(assoc % ktopic offset))))
-  
-(defn shutdown!
-  "Shutdown producer background thread"
-  [producer]
-  (timbre/info (str "Shutting down producer"))
-  ((:shutdown producer)))
-  

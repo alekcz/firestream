@@ -1,29 +1,17 @@
 (ns firestream.core-test
   (:require [clojure.test :refer [deftest is testing use-fixtures]]
-  					[clojure.core.async :as async]
-						[firestream.core :as f]
-						[hasch.core :refer [uuid]]
+  					[firestream.core :as f]
+						[fire.core :as fire]
 						[fire.auth :as auth]
-            [fire.core :as fire]
-						[malli.generator :as mg]
-						[durable-queue :as dq])
+            [malli.generator :as mg])
 	(:gen-class))
-
-(defn empty-cache! []
-  (let	[q (dq/queues "/tmp/firestream" {})]
-		(doall 
-			(pmap dq/complete! 
-				(filter #(not= :timed-out %) 
-					(doall (pmap (fn [_] 
-						(dq/take! q :firestream 0.05 :timed-out)) (range 100000))))))))
 
 (defn core-fixture [f]
 	(f/set-root "testing")
 	(f)
 	(let [auth (auth/create-token :fire)
         db  (:project-id auth)]
-		(fire/delete! db (deref f/root) auth)
-		(empty-cache!)))
+		(fire/delete! db (deref f/root) auth)))
  
 (use-fixtures :once core-fixture)	
 
@@ -45,8 +33,7 @@
 			(let [data (-> (f/poll! c 1500) topic1 first)]
 				(is (= payload (-> data :value)))
 				(f/commit! c {:offset (:id data) :topic topic1})
-				(is (empty? (->(f/poll! c 1500) topic1))))
-			(f/shutdown! p))))
+				(is (empty? (->(f/poll! c 1500) topic1)))))))
 
 (deftest two-topics-test
 	(testing "Subscribe two topics"
@@ -68,8 +55,7 @@
 				(is (= payload (-> data :value)))
 				(f/commit! c {:offset (:id data) :topic topic1})
 				(is (empty? (->(f/poll! c 1500) topic1))))
-				(is (= payload (-> (f/poll! c 1500) topic2 first :value)))
-			(f/shutdown! p))))
+				(is (= payload (-> (f/poll! c 1500) topic2 first :value))))))
 
 (deftest ordering-test
 	(testing "Unsubscribe"
@@ -88,8 +74,7 @@
 					received (-> (f/poll! c 3000) topic1)]
 			(is (= datastream (for [r received] (:value r))))
 			(f/commit! c {:topic topic1 :offset (-> received (nth mid) :id)})
-			(is (= split (for [r (-> (f/poll! c 3000) topic1)] (:value r))))
-			(f/shutdown! p))))
+			(is (= split (for [r (-> (f/poll! c 3000) topic1)] (:value r)))))))
 
 (deftest unsubscribe-test
 	(testing "Unsubscribe"
@@ -102,8 +87,7 @@
 					_ (Thread/sleep 1500)]
 			(is (= payload (-> (f/poll! c 1500) topic1 first :value)))
 			(f/unsubscribe! c topic1)
-			(is (empty? (->(f/poll! c 1500) topic1 first :value)))
-			(f/shutdown! p))))
+			(is (empty? (->(f/poll! c 1500) topic1 first :value))))))
 
 (deftest unique-test
 	(testing "Unique entries"
@@ -117,8 +101,7 @@
 					_ (f/send! p topic1 :key payload :unique)
 					_ (f/send! p topic1 :key payload :unique)
 					_ (Thread/sleep 1500)]
-			(is (= 1 (-> (f/poll! c 1500) topic1 count)))
-			(f/shutdown! p))))
+			(is (= 1 (-> (f/poll! c 1500) topic1 count))))))
 
 (deftest exceptions-test
 	(testing "Unsubscribe"
@@ -130,3 +113,25 @@
 					(try (f/producer {:env :missing-project-id}) (catch Exception e (.getMessage e)))))	
 		(is (= ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account" 
 					(try (f/consumer {:env :missing-project-id}) (catch Exception e (.getMessage e)))))))
+
+(deftest perf-test
+	(testing "Test write speed"
+		(let [topic1 (keyword (mg/generate [:re #"t-1-[a-zA-Z]{10,50}$"]))
+					p (f/producer {:env :fire})
+					c (f/consumer {:env :fire})
+					payload {:ha "haha"}
+					n 3000]
+			(f/subscribe! c topic1)
+			(doseq [num (range n)]
+				(f/send! p topic1 :key (assoc payload :n num)))
+			(Thread/sleep 10000)
+			(let [res (-> (f/poll! c 2000) topic1)
+						alpha (:created-ms (first res))
+						omega (:created-ms (last res))
+						_ (println alpha omega)
+						duration (- omega alpha)]
+				(println duration)
+				(is (> 5000 duration))
+				(is (= n (count res))))
+			(Thread/sleep 2000))))
+			
