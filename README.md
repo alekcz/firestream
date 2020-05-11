@@ -35,9 +35,8 @@ The design of `firestream`'s interface is inspired by [pyr's](https://github.com
 ## Limits
 The theoretical limits* of `firestream` (i.e. running it on the biggest machine you can find) are derived by using an 8th of the limits of firebase. For pico-scale applications or MVPs it's unlikely you'll hit the limits of firebase or `firestream`. Here they are anyway:
 
-- Maximum system throughput writes: ~1500 per second
-- Maximum payload during write: 2MB
-- Maximum write speed: ~1MB per second (my internet doesn't lemme test faster)
+- Individual producer throughput: ~2k per second (messages)
+- Maximum message size: 1MB (afer `pr-str`)
 - Maximmum data transfer per read: 200MB
 - Maximum number of messages per topic: 9 million
 

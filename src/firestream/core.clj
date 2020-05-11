@@ -8,7 +8,7 @@
             [clj-uuid :as uuid]))
 
 (set! *warn-on-reflection* 1)
-
+(def send-queue (async/chan (async/dropping-buffer 16384)))
 (def root (atom "/firestream2"))
 
 (defn- serialize [data]
@@ -23,6 +23,37 @@
 (defn- deep-clean [stain]
   (str/replace (str stain) #"^(?![a-zA-Z\d-:_])" ""))
 
+(defn- extract-data [cluster]
+  (let [sent-time (System/currentTimeMillis)
+        prep (fn [m] (-> m  (dissoc :producer :topic :root) (assoc :sent-ms sent-time)))]
+    (apply merge (map #(identity {(keyword (:id %)) (prep %)}) cluster))))
+
+(defn- send-topic [cluster]
+  (let [leader (first cluster)
+        topic (:topic leader) p (:producer leader)
+        root (:root leader) path (str root "/events/" topic)
+        dataset (extract-data cluster)]
+    (fire/update! (:db p) path dataset (:auth p) {:async false :print "silent"})))
+
+(defn- background-sender! []
+  (let [t (filter some? (repeatedly 5000 #(async/poll! send-queue)))]
+    (when (seq t)
+      (let [clusters (vals (group-by :topic t))]
+        (doall (map send-topic clusters))))
+    (count t)))
+
+(defn- sender! []
+  (let [control (atom true)]
+    (async/thread
+      (loop []
+        (try
+          (Thread/sleep 250)
+          (background-sender!)
+          (catch Exception e (.printStackTrace e)))
+        (when @control (recur))))
+    (fn []
+      (not (reset! control false)))))
+
 (defn set-root [new-root]
   (reset! root (str @root "-" (deep-clean new-root))))
 
@@ -33,10 +64,10 @@
         db (or (:bootstrap.servers config) (:project-id auth))]
     (when (str/blank? db) 
       (throw (Exception. ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account")))
-    (println (str "Created producer connected to: "  db ".firebaseio.com" @root))
     {:path @root
      :db db       
-     :auth (dissoc auth :new-token)}))
+     :auth auth
+     :shutdown (sender!)}))
 
 (defn send! 
   "Send new message to topic"
@@ -44,16 +75,16 @@
     (send! producer topic key value nil))
   ([producer topic key value unique]
     (let [time (uuid/get-timestamp (uuid/v1))
-          id  (if (nil? unique) (str "e" time) (str (uuid {:key key :value value})))
-          path (str @root "/events/" (name topic))
-          db (:db producer)
-          auth (:auth producer)
+          id (if (nil? unique) (str "e" time) (str (uuid {:key key :value value})))
           task {:data (serialize value)
                 :id id
+                :topic (name topic)
                 :created-ms (System/currentTimeMillis)
-                :key key}]
-      [(fire/update! db path {id task} auth {:async true :print "silent"})
-       (fire/write! db (str path "/" id "/received-ms")  {".sv" "timestamp"} auth {:async true :print "silent"})])))
+                :root @root
+                :key key
+                :producer (dissoc producer :shutdown :res)}]
+     (async/put! send-queue task))))
+      
 
 (defn consumer 
   "Create a consumer"
@@ -127,3 +158,8 @@
     {:offset offset :metadata (merge metadata  {:committed-ms (System/currentTimeMillis)})} 
     (:auth consumer))
   (swap! (:offsets consumer) #(assoc % ktopic offset))))
+
+(defn shutdown!
+  "Shutdown producer background thread"
+  [producer]
+  ((:shutdown producer)))

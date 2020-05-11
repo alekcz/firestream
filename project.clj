@@ -8,8 +8,7 @@
                   [io.replikativ/hasch "0.3.7"]
                   [io.replikativ/incognito "0.2.5"]
                   [org.clojure/core.async "1.1.587"]
-                  [danlentz/clj-uuid "0.1.9"]
-                  [tick "0.4.23-alpha"]]
+                  [danlentz/clj-uuid "0.1.9"]]
   :main ^:skip-aot firestream.core-test
   :repl-options {:init-ns firestream.core}
   :profiles { :dev {:dependencies [[metosin/malli "0.0.1-20200404.091302-14"]]}}
