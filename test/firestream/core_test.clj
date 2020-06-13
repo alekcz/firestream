@@ -74,7 +74,7 @@
 					_ (doseq [d datastream] 
 							(f/send! p topic1 :key d)
 							(Thread/sleep 100))
-					_ (Thread/sleep 5000)
+					_ (Thread/sleep 10000)
 					received (-> (f/poll! c 3000) topic1)]
 			(is (= datastream (for [r received] (:value r))))
 			(f/commit! c {:topic topic1 :offset (-> received (nth mid) :id)})
