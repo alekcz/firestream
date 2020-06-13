@@ -68,31 +68,23 @@ You can grab `firestream` from clojars:
 
 1. Get the `json` file containing your creditials by following the instruction here [https://firebase.google.com/docs/admin/setup](https://firebase.google.com/docs/admin/setup)  
 
-2. Set the GOOGLE_CLOUD_PROJECT environment to the firebase id of your project e.g. "alekcz-test"
+2. Set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to the contents of your `json` key file. Using [google-credentials](https://github.com/alekcz/google-credentials) firestream will pull the credentials from the specified environment variable: `GOOGLE_APPLICATION_CREDENTIALS`. (Sometimes it may be necessary to remove all the line breaks and wrap the key contents in single quotes to escape all the special characters within it. e.g. GOOGLE_APPLICATION_CREDENTIALS='`contents-of-json`')
 
-3. Set the FIREBASE_CONFIG environment variable to the contents of your `json` key file. (Sometimes it may be necessary to remove all the line breaks and wrap the key contents in single quotes to escape all the special characters within it. e.g. FIREBASE_CONFIG='`contents-of-json`')
-
-4. You're now good to go.
+3. You're now good to go.
 
 ## Usage
 
 ### Example
 ```clojure
-(require '[firestream.core :as fire])
+(require '[firestream.core :as f])
 
-(let [c (fire/consumer {:bootstrap.servers "stub" :group.id "kafkaesque"})]
-      (fire/subscribe! c "emails")
-      (fire/poll! c 100)
+(let [c (f/producer {:env "GOOGLE_APPLICATION_CREDENTIALS"})]
+      (f/send! p "emailqueue" :k0 {:name "Alexander the Great" :email "alex@macedon.gr"})   
+
+(let [c (f/consumer {:env "GOOGLE_APPLICATION_CREDENTIALS" :group.id "kafkaesque"})]
+      (f/subscribe! c "emailqueue")
+      (f/poll! c 100)
 ```
-But wait there's more
-```clojure
-(require '[firestream.core :as fire])
-
-(let [c (fire/producer {:bootstrap.servers "stub"})]
-      (fire/send! p "emails" :k0 {:name "Alexander the Great" :email "alex@macedon.gr"})   
-```
-
-
 
 ### API
 
