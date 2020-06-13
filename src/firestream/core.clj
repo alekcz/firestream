@@ -9,7 +9,7 @@
 
 (set! *warn-on-reflection* 1)
 (def send-queue (async/chan (async/dropping-buffer 16384)))
-(def root (atom "/firestream2"))
+(def firestream-root (atom "/firestream2"))
 
 (defn- serialize [data]
   (pr-str data))
@@ -21,7 +21,7 @@
       (assoc :value value))))
 
 (defn- deep-clean [stain]
-  (str/replace (str stain) #"^(?![a-zA-Z\d-:_])" ""))
+  (str/replace (str stain) #"^(?![a-zA-Z\d-:_/])" ""))
 
 (defn- extract-data [cluster]
   (let [sent-time (System/currentTimeMillis)
@@ -30,8 +30,10 @@
 
 (defn- send-topic [cluster]
   (let [leader (first cluster)
-        topic (:topic leader) p (:producer leader)
-        root (:root leader) path (str root "/events/" topic)
+        topic (:topic leader) 
+        p (:producer leader)
+        root (:root leader) 
+        path (str root "/events/" topic)
         dataset (extract-data cluster)]
     (fire/update! (:db p) path dataset (:auth p) {:async false :print "silent"})))
 
@@ -55,19 +57,23 @@
       (not (reset! control false)))))
 
 (defn set-root [new-root]
-  (reset! root (str @root "-" (deep-clean new-root))))
+  (reset! firestream-root (str @firestream-root "-" (deep-clean new-root))))
 
 (defn producer 
   "Create a producer"
   [config]
   (let [auth (fire-auth/create-token (:env config))
-        db (or (:bootstrap.servers config) (:project-id auth))]
+        db (or (:bootstrap.servers config) (:project-id auth))
+        root (str @firestream-root (or (:root config) "/default" ))]
     (when (str/blank? db) 
       (throw (Exception. ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account")))
-    {:path @root
-     :db db       
-     :auth auth
-     :shutdown (sender!)}))
+    (println (str "Created PRODUCER connected to: "  db ".firebaseio.com" root))
+    (let [shutdown (sender!)]
+      (.addShutdownHook (Runtime/getRuntime) (Thread. ^Runnable shutdown))
+      {:root (deep-clean root)
+      :db db       
+      :auth auth
+      :shutdown shutdown})))
 
 (defn send! 
   "Send new message to topic"
@@ -80,7 +86,7 @@
                 :id id
                 :topic (name topic)
                 :created-ms (System/currentTimeMillis)
-                :root @root
+                :root (:root producer)
                 :key key
                 :producer (dissoc producer :shutdown :res)}]
      (async/put! send-queue task))))
@@ -92,11 +98,12 @@
   (let [auth (fire-auth/create-token (:env config))
         db (or (:bootstrap.servers config) (:project-id auth))
         group-id (str (deep-clean (or (:group.id config) "default")))
-        read-handlers (get config :read-handlers (atom {}))]
+        read-handlers (get config :read-handlers (atom {}))
+        root (str @firestream-root (or (:root config) "/default" ))]
     (when (str/blank? db) 
       (throw (Exception. ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account")))
-    (println (str "Created consumer connected to: "  db ".firebaseio.com" @root))
-    {:path @root
+    (println (str "Created CONSUMER connected to: "  db ".firebaseio.com" root))
+    {:root (deep-clean root)
       :group-id group-id
       :db db
       :offsets (atom {})
@@ -114,7 +121,7 @@
               [timeout-ch 
               (fire/read 
                   (:db consumer) 
-                  (str (:path consumer) "/events/" (name topic)) 
+                  (str (:root consumer) "/events/" (name topic)) 
                   (:auth consumer) 
                   {:query query :async true})])
         data' (-> res first vals vec)
@@ -135,7 +142,7 @@
   (let [topic (name topic)
         ktopic (keyword topic)
         offset (fire/read (:db consumer) 
-                  (str (:path consumer) "/consumers/" (:group-id consumer) "/offsets/" topic) (:auth consumer))]
+                  (str (:root consumer) "/consumers/" (:group-id consumer) "/offsets/" topic) (:auth consumer))]
   (swap! (:topics consumer) #(conj % ktopic))
   (swap! (:offsets consumer) #(assoc % ktopic offset))
   (fetch-topic consumer ktopic 1000)))
@@ -154,7 +161,7 @@
         metadata (merge (:metadata offset-map) {})]
   (fire/update! 
     (:db consumer) 
-    (str (:path consumer) "/consumers/" (:group-id consumer) "/offsets/" topic)
+    (str (:root consumer) "/consumers/" (:group-id consumer) "/offsets/" topic)
     {:offset offset :metadata (merge metadata  {:committed-ms (System/currentTimeMillis)})} 
     (:auth consumer))
   (swap! (:offsets consumer) #(assoc % ktopic offset))))

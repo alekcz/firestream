@@ -7,11 +7,12 @@
 	(:gen-class))
 
 (defn core-fixture [f]
-	(f/set-root "testing")
+	(f/set-root "ci")
 	(f)
 	(let [auth (auth/create-token :fire)
         db  (:project-id auth)]
-		(fire/delete! db (deref f/root) auth)))
+		(fire/delete! db (deref f/firestream-root) auth)
+		nil))
  
 (use-fixtures :once core-fixture)	
 
@@ -20,8 +21,9 @@
 	(testing "Produce subscribe a commit"
 		(let [topic1 (keyword (mg/generate [:re #"t-1-[a-zA-Z]{10,50}$"]))
 					topic2 (keyword (mg/generate [:re #"t-1-[a-zA-Z]{10,50}$"]))
-					p (f/producer {:env :fire})
-					c (f/consumer {:env :fire})
+					root (mg/generate [:re #"/r-[a-zA-Z]{10,20}$"])
+					p (f/producer {:env :fire :root root})
+					c (f/consumer {:env :fire :root root})
 					payload {:ha "haha"}
 					_ (f/subscribe! c topic1)
 					_ (f/send! p topic1 :key payload)
