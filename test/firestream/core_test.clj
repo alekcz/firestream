@@ -134,7 +134,7 @@
 			(let [res (-> (f/poll! c 2000) topic1)
 						alpha (:created-ms (first res))
 						omega (:sent-ms (last res))]
-				(println "Elapsed time (n= 10 000):"(- omega alpha) "msecs")
+				(println "Elapsed time (n = 10 000):"(- omega alpha) "msecs")
 				(is (> 5000 (- omega alpha)))
 				(is (= n (count res))))
 			(Thread/sleep 2000))))
