@@ -8,7 +8,7 @@
 
 (defn core-fixture [f]
 	(f/set-root "ci")
-	(f/set-expiry 3000)
+	(f/set-expiry 12000)
 	(f)
 	(let [auth (auth/create-token :fire)
         db  (:project-id auth)]
@@ -17,8 +17,8 @@
  
 (use-fixtures :once core-fixture)	
 
-(def shortms 3000)
-(def medms 5000)
+(def shortms 5000)
+(def mediumms 8000)
 
 (deftest round-trip-test
 	(testing "Produce subscribe a commit"
@@ -78,10 +78,10 @@
 							(f/send! p topic1 :key d)
 							(Thread/sleep 100))
 					_ (Thread/sleep 10000)
-					received (-> (f/poll! c medms) topic1)]
+					received (-> (f/poll! c mediumms) topic1)]
 			(is (= datastream (for [r received] (:value r))))
 			(f/commit! c {:topic topic1 :offset (-> received (nth mid) :id)})
-			(is (= split (for [r (-> (f/poll! c medms) topic1)] (:value r))))
+			(is (= split (for [r (-> (f/poll! c mediumms) topic1)] (:value r))))
 			(f/shutdown! p))))
 
 (deftest unsubscribe-test
@@ -92,7 +92,8 @@
 					payload {:ha "haha"}
 					_ (f/subscribe! c topic1)
 					_ (f/send! p topic1 :key payload)
-					_ (Thread/sleep shortms)]
+					_ (Thread/sleep (* 2 mediumms))
+					_ (f/send! p topic1 :key payload)]
 			(is (= payload (-> (f/poll! c shortms) topic1 first :value)))
 			(f/unsubscribe! c topic1)
 			(is (empty? (->(f/poll! c shortms) topic1 first :value))))))
@@ -134,7 +135,7 @@
 			(doseq [num (range n)]
 				(f/send! p topic1 :key (assoc payload :n num)))
 			(Thread/sleep 10000)
-			(let [res (-> (f/poll! c medms) topic1)]
+			(let [res (-> (f/poll! c mediumms) topic1)]
 				(is (= n (count res))))
-			(Thread/sleep medms))))
+			(Thread/sleep mediumms))))
 			
