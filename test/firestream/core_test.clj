@@ -8,6 +8,7 @@
 
 (defn core-fixture [f]
 	(f/set-root "ci")
+	(f/set-expiry 3000)
 	(f)
 	(let [auth (auth/create-token :fire)
         db  (:project-id auth)]
@@ -16,6 +17,8 @@
  
 (use-fixtures :once core-fixture)	
 
+(def shortms 3000)
+(def medms 5000)
 
 (deftest round-trip-test
 	(testing "Produce subscribe a commit"
@@ -28,14 +31,14 @@
 					_ (f/subscribe! c topic1)
 					_ (f/send! p topic1 :key payload)
 					_ (f/send! p topic2 :key payload)
-					_ (Thread/sleep 1500)]
+					_ (Thread/sleep shortms)]
 			(is (empty? (-> (f/poll! c 1) topic1)))
-			(is (= payload (-> (f/poll! c 1500) topic1 first :value)))
-			(is (empty? (-> (f/poll! c 1500) topic2)))
-			(let [data (-> (f/poll! c 1500) topic1 first)]
+			(is (= payload (-> (f/poll! c shortms) topic1 first :value)))
+			(is (empty? (-> (f/poll! c shortms) topic2)))
+			(let [data (-> (f/poll! c shortms) topic1 first)]
 				(is (= payload (-> data :value)))
 				(f/commit! c {:offset (:id data) :topic topic1})
-				(is (empty? (->(f/poll! c 1500) topic1))))
+				(is (empty? (->(f/poll! c shortms) topic1))))
 			(f/shutdown! p))))
 
 (deftest two-topics-test
@@ -51,14 +54,14 @@
 					_ (f/subscribe! c topic2)
 					_ (f/send! p topic1 :key payload)
 					_ (f/send! p topic2 :key payload)
-					_ (Thread/sleep 1500)]
-			(is (= payload (-> (f/poll! c 1500) topic1 first :value)))
-			(is (= payload (-> (f/poll! c 1500) topic2 first :value)))
-			(let [data (-> (f/poll! c 1500) topic1 first)]
+					_ (Thread/sleep shortms)]
+			(is (= payload (-> (f/poll! c shortms) topic1 first :value)))
+			(is (= payload (-> (f/poll! c shortms) topic2 first :value)))
+			(let [data (-> (f/poll! c shortms) topic1 first)]
 				(is (= payload (-> data :value)))
 				(f/commit! c {:offset (:id data) :topic topic1})
-				(is (empty? (->(f/poll! c 1500) topic1))))
-				(is (= payload (-> (f/poll! c 1500) topic2 first :value)))
+				(is (empty? (->(f/poll! c shortms) topic1))))
+				(is (= payload (-> (f/poll! c shortms) topic2 first :value)))
 			(f/shutdown! p))))
 
 (deftest ordering-test
@@ -75,10 +78,10 @@
 							(f/send! p topic1 :key d)
 							(Thread/sleep 100))
 					_ (Thread/sleep 10000)
-					received (-> (f/poll! c 3000) topic1)]
+					received (-> (f/poll! c medms) topic1)]
 			(is (= datastream (for [r received] (:value r))))
 			(f/commit! c {:topic topic1 :offset (-> received (nth mid) :id)})
-			(is (= split (for [r (-> (f/poll! c 3000) topic1)] (:value r))))
+			(is (= split (for [r (-> (f/poll! c medms) topic1)] (:value r))))
 			(f/shutdown! p))))
 
 (deftest unsubscribe-test
@@ -89,10 +92,10 @@
 					payload {:ha "haha"}
 					_ (f/subscribe! c topic1)
 					_ (f/send! p topic1 :key payload)
-					_ (Thread/sleep 1500)]
-			(is (= payload (-> (f/poll! c 1500) topic1 first :value)))
+					_ (Thread/sleep shortms)]
+			(is (= payload (-> (f/poll! c shortms) topic1 first :value)))
 			(f/unsubscribe! c topic1)
-			(is (empty? (->(f/poll! c 1500) topic1 first :value))))))
+			(is (empty? (->(f/poll! c shortms) topic1 first :value))))))
 
 (deftest unique-test
 	(testing "Unique entries"
@@ -105,8 +108,8 @@
 					_ (f/send! p topic1 :key payload :unique)
 					_ (f/send! p topic1 :key payload :unique)
 					_ (f/send! p topic1 :key payload :unique)
-					_ (Thread/sleep 1500)]
-			(is (= 1 (-> (f/poll! c 1500) topic1 count)))
+					_ (Thread/sleep shortms)]
+			(is (= 1 (-> (f/poll! c shortms) topic1 count)))
 			(f/shutdown! p))))
 
 (deftest exceptions-test
@@ -126,16 +129,12 @@
 					p (f/producer {:env :fire})
 					c (f/consumer {:env :fire})
 					payload {:ha "haha"}
-					n 10000]
+					n 20000]
 			(f/subscribe! c topic1)
 			(doseq [num (range n)]
 				(f/send! p topic1 :key (assoc payload :n num)))
 			(Thread/sleep 10000)
-			(let [res (-> (f/poll! c 2000) topic1)
-						alpha (:created-ms (first res))
-						omega (:sent-ms (last res))]
-				(println "Elapsed time (n = 10 000):"(- omega alpha) "msecs")
-				(is (> 5000 (- omega alpha)))
+			(let [res (-> (f/poll! c medms) topic1)]
 				(is (= n (count res))))
-			(Thread/sleep 2000))))
+			(Thread/sleep medms))))
 			

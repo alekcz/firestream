@@ -9,6 +9,7 @@
 
 (set! *warn-on-reflection* 1)
 (def send-queue (async/chan (async/dropping-buffer 16384)))
+(def expiry (atom (* 10 60 1000))) ;default to 10 min
 (def firestream-root (atom "/firestream2"))
 
 (defn- serialize [data]
@@ -34,11 +35,17 @@
         p (:producer leader)
         root (:root leader) 
         path (str root "/events/" topic)
-        dataset (extract-data cluster)]
-    (fire/update! (:db p) path dataset (:auth p) {:async false :print "silent"})))
+        dataset (extract-data cluster)
+        auth (:auth p)
+        now (inst-ms (java.util.Date.))]
+     (when (> now (deref (:expiry p))) 
+      (println "refreshing")
+      (reset! (:auth p) (fire-auth/create-token (:env p)))
+      (reset! (:expiry p) (+ @expiry (inst-ms (java.util.Date.)))))
+    (fire/update! (:db p) path dataset @auth {:async false :print "silent"})))
 
 (defn- background-sender! []
-  (let [t (filter some? (repeatedly 5000 #(async/poll! send-queue)))]
+  (let [t (filter some? (repeatedly 8000 #(async/poll! send-queue)))]
     (when (seq t)
       (let [clusters (vals (group-by :topic t))]
         (doall (map send-topic clusters))))
@@ -49,7 +56,7 @@
     (async/thread
       (loop []
         (try
-          (Thread/sleep 250)
+          (Thread/sleep 200)
           (background-sender!)
           (catch Exception e (.printStackTrace e)))
         (when @control (recur))))
@@ -58,6 +65,9 @@
 
 (defn set-root [new-root]
   (reset! firestream-root (str @firestream-root "-" (deep-clean new-root))))
+
+(defn set-expiry [milli]
+  (reset! expiry milli))
 
 (defn producer 
   "Create a producer"
@@ -71,8 +81,10 @@
     (let [shutdown (sender!)]
       (.addShutdownHook (Runtime/getRuntime) (Thread. ^Runnable shutdown))
       {:root (deep-clean root)
-      :db db       
-      :auth auth
+      :db db   
+      :env (:env config)     
+      :expiry (atom (+ @expiry (inst-ms (java.util.Date.))))
+      :auth (atom auth)
       :shutdown shutdown})))
 
 (defn send! 
