@@ -120,10 +120,15 @@
       :offsets (atom {})
       :read-handlers read-handlers 
       :topics (atom #{})
-      :auth auth}))
+      :env (:env config)     
+      :expiry (atom (+ @expiry (inst-ms (java.util.Date.))))
+      :auth (atom auth)}))
 
 
 (defn- fetch-topic [consumer topic timeout]
+  (when (> (inst-ms (java.util.Date.)) (deref (:expiry consumer))) 
+      (reset! (:auth consumer) (fire-auth/create-token (:env consumer)))
+      (reset! (:expiry consumer) (+ @expiry (inst-ms (java.util.Date.)))))
   (let [timeout-ch (async/timeout timeout) 
         offset' (-> consumer :offsets deref topic)
         offset (or (:offset offset') offset')
@@ -133,7 +138,7 @@
               (fire/read 
                   (:db consumer) 
                   (str (:root consumer) "/events/" (name topic)) 
-                  (:auth consumer) 
+                  (-> consumer :auth deref) 
                   {:query query :async true})])
         data' (-> res first vals vec)
         data  (sort-by :id (for [d data'] (deserialize (into {} d))))
@@ -153,7 +158,7 @@
   (let [topic (name topic)
         ktopic (keyword topic)
         offset (fire/read (:db consumer) 
-                  (str (:root consumer) "/consumers/" (:group-id consumer) "/offsets/" topic) (:auth consumer))]
+                  (str (:root consumer) "/consumers/" (:group-id consumer) "/offsets/" topic) (-> consumer :auth deref))]
   (swap! (:topics consumer) #(conj % ktopic))
   (swap! (:offsets consumer) #(assoc % ktopic offset))
   (fetch-topic consumer ktopic 1000)))
@@ -174,7 +179,7 @@
     (:db consumer) 
     (str (:root consumer) "/consumers/" (:group-id consumer) "/offsets/" topic)
     {:offset offset :metadata (merge metadata  {:committed-ms (System/currentTimeMillis)})} 
-    (:auth consumer))
+    (-> consumer :auth deref))
   (swap! (:offsets consumer) #(assoc % ktopic offset))))
 
 (defn shutdown!

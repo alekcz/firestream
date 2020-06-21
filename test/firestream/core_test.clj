@@ -134,7 +134,7 @@
 			(f/subscribe! c topic1)
 			(doseq [num (range n)]
 				(f/send! p topic1 :key (assoc payload :n num)))
-			(Thread/sleep 10000)
+			(Thread/sleep 15000)
 			(let [res (-> (f/poll! c mediumms) topic1)]
 				(is (= n (count res))))
 			(Thread/sleep mediumms))))
