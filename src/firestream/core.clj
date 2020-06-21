@@ -39,7 +39,6 @@
         auth (:auth p)
         now (inst-ms (java.util.Date.))]
      (when (> now (deref (:expiry p))) 
-      (println "refreshing")
       (reset! (:auth p) (fire-auth/create-token (:env p)))
       (reset! (:expiry p) (+ @expiry (inst-ms (java.util.Date.)))))
     (fire/update! (:db p) path dataset @auth {:async false :print "silent"})))
