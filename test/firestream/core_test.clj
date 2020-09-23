@@ -114,15 +114,11 @@
 			(f/shutdown! p))))
 
 (deftest exceptions-test
-	(testing "Unsubscribe"
-		(is (= "Environment variable :missing-env is empty or does not exist" 
-					(try (f/producer {:env :missing-env}) (catch Exception e (.getMessage e)))))	
-		(is (= "Environment variable :missing-env is empty or does not exist" 
-					(try (f/consumer {:env :missing-env}) (catch Exception e (.getMessage e)))))
-		(is (= ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account" 
-					(try (f/producer {:env :missing-project-id}) (catch Exception e (.getMessage e)))))	
-		(is (= ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account" 
-					(try (f/consumer {:env :missing-project-id}) (catch Exception e (.getMessage e)))))))
+	(testing "Exceptions"
+		(is (= "failed" (try (f/producer {:env :missing-env}) (catch Exception _ "failed"))))	
+		(is (= "failed" (try (f/consumer {:env :missing-env}) (catch Exception _ "failed"))))
+		(is (= "failed" (try (f/producer {:env :missing-project-id}) (catch Exception _ "failed"))))	
+		(is (= "failed" (try (f/consumer {:env :missing-project-id}) (catch Exception _ "failed"))))))
 
 (deftest perf-test
 	(testing "Test write speed"
