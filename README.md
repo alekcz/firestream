@@ -6,7 +6,6 @@ Kafkaesque streams built on firebase
 
 [![Clojars Project](https://img.shields.io/clojars/v/alekcz/firestream.svg)](https://clojars.org/alekcz/firestream)
 
-
 ## Design 
 `firestream` is designed to provide kafakaesque streams with minimal hassle for pico-scale applications or MVPs. Once your application is no longer pico-scale using `firestream` is a great way to ensure bad things happen. `firestream` is aimed to give your application (or business) the runway grow enough to be able to absorb the operational cost of `kafka`. 
 
@@ -25,13 +24,6 @@ There is only one broker, that broker is your firebase instance. There is only c
 ### Interface
 The design of `firestream`'s interface is inspired by [pyr's](https://github.com/pyr) somewhat opinionated client library for `kafka` [kinsky](https://github.com/pyr/kinsky).
 
-### Why firebase
-
-"Once connectivity is reestablished, we'll receive the appropriate set of events so that the client "catches up" with the current server state, without having to write any custom code." - Peeps from Firebase
-
-[Offline writes](https://firebase.google.com/docs/database/admin/save-data#section-writes-offline)
-
-
 ## Limits
 The theoretical limits* of `firestream` (i.e. running it on the biggest machine you can find) are derived by using an 8th of the limits of firebase. For pico-scale applications or MVPs it's unlikely you'll hit the limits of firebase or `firestream`. Here they are anyway:
 
@@ -47,7 +39,7 @@ The theoretical limits* of `firestream` (i.e. running it on the biggest machine 
 ## Installation
 
 You can grab `firestream` from clojars:    
-`[alekcz/firestream "1.0.0"]`
+`[alekcz/firestream "2.0.0-SNAPSHOT"]`
 
 
 ### Setting up firebase
