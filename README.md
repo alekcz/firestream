@@ -7,7 +7,7 @@ Kafkaesque streams built on firebase
 [![Clojars Project](https://img.shields.io/clojars/v/alekcz/firestream.svg)](https://clojars.org/alekcz/firestream)
 
 ## Design 
-`firestream` is designed to provide kafakaesque streams with minimal hassle for pico-scale applications or MVPs. Once your application is no longer pico-scale using `firestream` is a great way to ensure bad things happen. `firestream` is aimed to give your application (or business) the runway grow enough to be able to absorb the operational cost of `kafka`. 
+`firestream` is designed to provide kafakaesque streams with minimal hassle for micro-scale applications or MVPs. Once your application is no longer micro-scale using `firestream` is a great way to ensure bad things happen. `firestream` is aimed to give your application (or business) the runway grow until it can absorb the operational cost of `kafka`. 
 
 ### Schema 
 At both rest and in transit all messages are stored as stringified `json` objects. `firestream` itself works in `clojure` maps. 
@@ -19,7 +19,7 @@ Partitions are not provided for in `firestream`. If you really really really nee
 Like `kafka`, `firestream` allows for multiple consumer and producers. It however only allows for consumer groups with one consumer. If you really really really need more than one consume in a consumer group, it's probably time to switch to `kafka`.
 
 ### Brokers and clusters
-There is only one broker, that broker is your firebase instance. There is only cluster
+There is only one broker, that broker is your firebase instance. There is only one cluster
 
 ### Interface
 The design of `firestream`'s interface is inspired by [pyr's](https://github.com/pyr) somewhat opinionated client library for `kafka` [kinsky](https://github.com/pyr/kinsky).
@@ -34,12 +34,12 @@ The theoretical limits* of `firestream` (i.e. running it on the biggest machine 
 
 *It's quite likely that you can get more perf than the above, but better safe than sorry.
 
-[Firebase usuage limits in case they change](https://firebase.google.com/docs/database/usage/limits)
+[Firebase usage limits in case they change](https://firebase.google.com/docs/database/usage/limits)
 
 ## Installation
 
 You can grab `firestream` from clojars:    
-`[alekcz/firestream "2.0.0-SNAPSHOT"]`
+`[alekcz/firestream "2.0.0"]`
 
 
 ### Setting up firebase
