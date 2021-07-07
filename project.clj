@@ -1,13 +1,13 @@
-(defproject  alekcz/firestream "2.0.1"
+(defproject  alekcz/firestream "2.0.2"
   :description "firestream: kafkaesque streams built on firebase"
   :url "https://github.com/alekcz/firestream"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
             :url "https://www.eclipse.org/legal/epl-2.0/"}
-  :dependencies [ [org.clojure/clojure "1.10.2-alpha1"]
-                  [alekcz/fire "0.3.2"]
+  :dependencies [ [org.clojure/clojure "1.10.3" :scope "provided"]
+                  [alekcz/fire "0.4.1"]
                   [io.replikativ/hasch "0.3.7"]
-                  [io.replikativ/incognito "0.2.5"]
-                  [org.clojure/core.async "1.1.587"]
+                  [io.replikativ/incognito "0.2.7"]
+                  [org.clojure/core.async "1.3.618"]
                   [danlentz/clj-uuid "0.1.9"]]
   :main ^:skip-aot firestream.core-test
   :repl-options {:init-ns firestream.core}
