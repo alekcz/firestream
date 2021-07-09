@@ -11,6 +11,7 @@
 (def send-queue (async/chan (async/dropping-buffer 16384)))
 (def expiry (atom (* 10 60 1000))) ;default to 10 min
 (def firestream-root (atom "/firestream2"))
+(def acceptable-drift (atom 10000))
 
 (defn- serialize [data]
   (pr-str data))
@@ -65,8 +66,11 @@
 (defn set-root [new-root]
   (reset! firestream-root (str @firestream-root "-" (deep-clean new-root))))
 
-(defn set-expiry [milli]
-  (reset! expiry milli))
+(defn set-expiry [ms]
+  (reset! expiry ms))
+
+(defn set-acceptable-drift [ms]
+  (reset! acceptable-drift ms))
 
 (defn producer 
   "Create a producer"
@@ -97,6 +101,7 @@
                 :id id
                 :topic (name topic)
                 :created-ms (System/currentTimeMillis)
+                :received-ms {:.sv "timestamp"}
                 :root (:root producer)
                 :key key
                 :producer (dissoc producer :shutdown :res)}]
@@ -124,6 +129,17 @@
       :expiry (atom (+ @expiry (inst-ms (java.util.Date.))))
       :auth (atom auth)}))
 
+(defn valid? [item]
+  (-> 
+    (- (:received-ms item) (:created-ms item))
+    (int)
+    (Math/abs)
+    (< @acceptable-drift)))
+
+(def topic-xf
+  (comp
+    (filter valid?)
+    (map deserialize)))
 
 (defn- fetch-topic [consumer topic timeout]
   (when (> (inst-ms (java.util.Date.)) (deref (:expiry consumer))) 
@@ -140,8 +156,8 @@
                   (str (:root consumer) "/events/" (name topic)) 
                   (-> consumer :auth deref) 
                   {:query query :async true})])
-        data' (-> res first vals vec)
-        data  (sort-by :id (for [d data'] (deserialize (into {} d))))
+        data' (-> res first vals)
+        data  (sort-by :id (into [] topic-xf data'))
         channel (second res)]
     (if (= channel timeout-ch)
       []
