@@ -8,7 +8,7 @@
             [clj-uuid :as uuid]))
 
 (set! *warn-on-reflection* 1)
-(def send-queue (async/chan (async/dropping-buffer 16384)))
+(def send-queue (async/chan (async/dropping-buffer 65536)))
 (def expiry (atom (* 10 60 1000))) ;default to 10 min
 (def firestream-root (atom "/firestream2"))
 (def acceptable-drift (atom 10000))
@@ -80,7 +80,7 @@
         root (str @firestream-root (or (:root config) "/default" ))]
     (when (str/blank? db) 
       (throw (Exception. ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account")))
-    (println (str "Created PRODUCER connected to: "  db ".firebaseio.com" root))
+    (println (str "Created PRODUCER connected to database: "  db " with " root " as the root"))
     (let [shutdown (sender!)]
       (.addShutdownHook (Runtime/getRuntime) (Thread. ^Runnable shutdown))
       {:root (deep-clean root)
@@ -118,7 +118,7 @@
         root (str @firestream-root (or (:root config) "/default" ))]
     (when (str/blank? db) 
       (throw (Exception. ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account")))
-    (println (str "Created CONSUMER connected to: "  db ".firebaseio.com" root))
+    (println (str "Created CONSUMER connected to database: "  db " with " root " as the root"))
     {:root (deep-clean root)
       :group-id group-id
       :db db
@@ -130,12 +130,10 @@
       :auth (atom auth)}))
 
 (defn valid? [item]
-  (-> 
-    (- (:received-ms item) (:created-ms item))
-    (int)
-    (Math/abs)
-    (< @acceptable-drift)))
-
+  (and 
+    (< (:created-ms item) (+ (:received-ms item)  @acceptable-drift))
+    (> (:created-ms item)  (- (:received-ms item)  @acceptable-drift))))
+    
 (def topic-xf
   (comp
     (filter valid?)
