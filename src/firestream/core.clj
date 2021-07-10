@@ -5,13 +5,14 @@
             [fire.core :as fire]
             [incognito.edn :refer [read-string-safe]]
             [hasch.core :refer [uuid]]
-            [clj-uuid :as uuid]))
+            [clj-uuid :as uuid]
+            [taoensso.timbre :as timbre]))
 
 (set! *warn-on-reflection* 1)
 (def send-queue (async/chan (async/dropping-buffer 65536)))
 (def expiry (atom (* 10 60 1000))) ;default to 10 min
 (def firestream-root (atom "/firestream2"))
-(def acceptable-drift (atom 10000))
+(def ^:dynamic acceptable-drift 10000)
 
 (defn- serialize [data]
   (pr-str data))
@@ -45,7 +46,7 @@
     (fire/update! (:db p) path dataset @auth {:async false :print "silent"})))
 
 (defn- background-sender! []
-  (let [t (filter some? (repeatedly 8000 #(async/poll! send-queue)))]
+  (let [t (filter some? (repeatedly 65536 #(async/poll! send-queue)))]
     (when (seq t)
       (let [clusters (vals (group-by :topic t))]
         (doall (map send-topic clusters))))
@@ -56,7 +57,7 @@
     (async/thread
       (loop []
         (try
-          (Thread/sleep 200)
+          (Thread/sleep 25)
           (background-sender!)
           (catch Exception e (.printStackTrace e)))
         (when @control (recur))))
@@ -69,9 +70,6 @@
 (defn set-expiry [ms]
   (reset! expiry ms))
 
-(defn set-acceptable-drift [ms]
-  (reset! acceptable-drift ms))
-
 (defn producer 
   "Create a producer"
   [config]
@@ -80,7 +78,7 @@
         root (str @firestream-root (or (:root config) "/default" ))]
     (when (str/blank? db) 
       (throw (Exception. ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account")))
-    (println (str "Created PRODUCER connected to database: "  db " with " root " as the root"))
+    (timbre/info (str "Created PRODUCER connected to database: "  db " with " root " as the root"))
     (let [shutdown (sender!)]
       (.addShutdownHook (Runtime/getRuntime) (Thread. ^Runnable shutdown))
       {:root (deep-clean root)
@@ -118,7 +116,7 @@
         root (str @firestream-root (or (:root config) "/default" ))]
     (when (str/blank? db) 
       (throw (Exception. ":bootstrap.servers cannot be empty. Could not detect :bootstrap.servers from service account")))
-    (println (str "Created CONSUMER connected to database: "  db " with " root " as the root"))
+    (timbre/info (str "Created CONSUMER connected to database: "  db " with " root " as the root"))
     {:root (deep-clean root)
       :group-id group-id
       :db db
@@ -131,8 +129,8 @@
 
 (defn valid? [item]
   (and 
-    (< (:created-ms item) (+ (:received-ms item)  @acceptable-drift))
-    (> (:created-ms item)  (- (:received-ms item)  @acceptable-drift))))
+    (< (:created-ms item) (+ (:received-ms item)  acceptable-drift))
+    (> (:created-ms item)  (- (:received-ms item) acceptable-drift))))
     
 (def topic-xf
   (comp
@@ -175,7 +173,8 @@
                   (str (:root consumer) "/consumers/" (:group-id consumer) "/offsets/" topic) (-> consumer :auth deref))]
   (swap! (:topics consumer) #(conj % ktopic))
   (swap! (:offsets consumer) #(assoc % ktopic offset))
-  (fetch-topic consumer ktopic 1000)))
+  ;; (fetch-topic consumer ktopic 1000)
+  ))
 
 (defn unsubscribe! 
   "Unsubscribe to a topic"

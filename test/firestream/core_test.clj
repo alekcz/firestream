@@ -130,8 +130,23 @@
 			(f/subscribe! c topic1)
 			(doseq [num (range n)]
 				(f/send! p topic1 :key (assoc payload :n num)))
-			(Thread/sleep 15000)
+			(Thread/sleep 5000)
 			(let [res (-> (f/poll! c mediumms) topic1)]
 				(is (= n (count res))))
-			(Thread/sleep mediumms))))
+			(f/shutdown! p))))
 			
+(deftest drift-test
+	(testing "Test write speed"
+		(let [topic1 (keyword (mg/generate [:re #"t-1-[a-zA-Z]{10,50}$"]))
+					p (f/producer {:env :fire})
+					c (f/consumer {:env :fire})
+					payload {:ha "haha"}
+					n 1000]
+			(f/subscribe! c topic1)
+			(doseq [num (range n)]
+				(f/send! p topic1 :key (assoc payload :n num)))
+			(Thread/sleep 5000)
+      (binding [f/acceptable-drift 0]
+        (let [res (-> (f/poll! c mediumms) topic1)]
+          (is (= 0 (count res)))))
+			(f/shutdown! p))))      
