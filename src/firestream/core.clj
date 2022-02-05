@@ -6,7 +6,8 @@
             [incognito.edn :refer [read-string-safe]]
             [hasch.core :refer [uuid]]
             [clj-uuid :as uuid]
-            [taoensso.timbre :as timbre]))
+            [taoensso.timbre :as timbre])
+  (:gen-class))
 
 (set! *warn-on-reflection* 1)
 (def send-queue (async/chan (async/dropping-buffer 65536)))
