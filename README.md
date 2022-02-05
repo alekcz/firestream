@@ -2,7 +2,7 @@
 
 Kafkaesque streams built on firebase
 
-![Clojure CI](https://github.com/alekcz/firestream/workflows/Clojure%20CI/badge.svg) [![codecov](https://codecov.io/gh/alekcz/firestream/branch/master/graph/badge.svg)](https://codecov.io/gh/alekcz/firestream) [![Dependencies Status](https://versions.deps.co/alekcz/firestream/status.svg)](https://versions.deps.co/alekcz/firestream)
+![Clojure CI](https://github.com/alekcz/firestream/workflows/Clojure%20CI/badge.svg) [![codecov](https://codecov.io/gh/alekcz/firestream/branch/master/graph/badge.svg)](https://codecov.io/gh/alekcz/firestream) 
 
 [![Clojars Project](https://img.shields.io/clojars/v/alekcz/firestream.svg)](https://clojars.org/alekcz/firestream)
 
